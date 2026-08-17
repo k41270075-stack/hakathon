@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Optional
 
 import typer
 from rich.console import Console
@@ -57,7 +56,7 @@ def version() -> None:
 
 @app.command()
 def info(
-    config: Optional[str] = typer.Option(None, "--config", "-c", help="Путь к default.yaml"),
+    config: str | None = typer.Option(None, "--config", "-c", help="Путь к default.yaml"),
 ) -> None:
     """Показать текущую конфигурацию: область, период, ключевые пороги."""
     settings = load_settings(config)
@@ -87,7 +86,7 @@ def info(
 
 @app.command()
 def doctor(
-    config: Optional[str] = typer.Option(None, "--config", "-c"),
+    config: str | None = typer.Option(None, "--config", "-c"),
 ) -> None:
     """Проверка готовности к сдаче.
 
@@ -129,9 +128,9 @@ def doctor(
 
 @app.command()
 def scenes(
-    config: Optional[str] = typer.Option(None, "--config", "-c"),
+    config: str | None = typer.Option(None, "--config", "-c"),
     collection: str = typer.Option("s2", "--collection", help="s2 | s1 | landsat"),
-    output: Optional[str] = typer.Option(None, "--output", "-o", help="Сохранить список в JSON"),
+    output: str | None = typer.Option(None, "--output", "-o", help="Сохранить список в JSON"),
 ) -> None:
     """Сколько сцен реально доступно по нашей области и периоду.
 
