@@ -104,20 +104,41 @@ def doctor(
         warnings.append(f"AOI очень большая ({aoi.area_km2:,.0f} км²) — полный прогон будет долгим")
 
     econ = load_economics()
-    todos = econ.unresolved_sources()
-    for path in todos:
-        problems.append(f"economics: не указан источник для «{path}»")
+    for path in econ.unresolved_sources():
+        problems.append(f"economics: происхождение параметра «{path}» помечено TODO")
 
-    if "TODO" in str(econ.raw.get("penalty", {}).get("code_article", "")):
-        problems.append("economics: не указана статья Экологического кодекса РК")
+    penalty = econ.raw.get("penalty", {})
+    if not penalty.get("articles"):
+        problems.append("economics: не заданы статьи КоАП для расчёта штрафа")
+    if not econ.raw.get("mrp_kzt", {}).get("value"):
+        problems.append("economics: не задан размер МРП")
+
+    documented = econ.documented_parameters()
+    estimated = econ.estimated_parameters()
 
     console.rule("[bold]Проверка готовности")
+
+    table = Table(show_header=True, header_style="bold")
+    table.add_column("Происхождение параметров", style="cyan")
+    table.add_column("Кол-во", justify="right")
+    table.add_column("Что это значит")
+    table.add_row("Подтверждено источником", str(len(documented)), "есть ссылка на закон, методику или прайс")
+    table.add_row("Инженерная оценка", str(len(estimated)), "открытого источника нет; проверяется Монте-Карло")
+    table.add_row("Не объяснено (TODO)", str(len(econ.unresolved_sources())), "блокирует сдачу")
+    console.print(table)
+
+    if estimated:
+        console.print("\n[bold]На Q&A спросят именно про эти величины:[/bold]")
+        for path in estimated:
+            console.print(f"  [yellow]~[/yellow] {path}")
+
+    console.print()
     if problems:
-        console.print(f"[bold red]Проблем: {len(problems)}[/bold red]")
+        console.print(f"[bold red]Блокирующих проблем: {len(problems)}[/bold red]")
         for p in problems:
-            console.print(f"  [red]✗[/red] {p}")
+            console.print(f"  [red]x[/red] {p}")
     else:
-        console.print("[bold green]✓ Блокирующих проблем нет[/bold green]")
+        console.print("[bold green]OK — блокирующих проблем нет[/bold green]")
 
     for w in warnings:
         console.print(f"  [yellow]![/yellow] {w}")
