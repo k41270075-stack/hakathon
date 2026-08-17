@@ -97,7 +97,6 @@ def local_background(
 
     # Кольцевой элемент: центральная область исключается, чтобы сам
     # объект не входил в оценку собственного фона.
-    size = 2 * radius_px + 1
     y, x = np.ogrid[-radius_px : radius_px + 1, -radius_px : radius_px + 1]
     distance = np.hypot(y, x)
     ring = (distance <= radius_px) & (distance > radius_px / 2)
@@ -152,7 +151,7 @@ def radius_in_pixels(radius_m: float, resolution_m: float) -> int:
     """Перевести радиус фона из метров в пиксели."""
     if resolution_m <= 0:
         raise ValueError("разрешение должно быть положительным")
-    return max(1, int(round(radius_m / resolution_m)))
+    return max(1, round(radius_m / resolution_m))
 
 
 def build_thermal_stack(aoi, settings, items, *, chunks: dict | None = None):
