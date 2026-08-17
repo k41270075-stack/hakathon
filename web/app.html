@@ -37,8 +37,9 @@
 
   <div class="tabs" role="tablist">
     <button class="tab active" id="tab-map" role="tab" type="button">Карта</button>
+    <button class="tab accent" id="tab-forecast" role="tab" type="button">Прогноз</button>
     <button class="tab" id="tab-story" role="tab" type="button">Сценарий защиты</button>
-    <button class="tab" id="tab-method" role="tab" type="button">Как это работает</button>
+    <button class="tab" id="tab-method" role="tab" type="button">Метод</button>
   </div>
 
   <div class="bar-right">
@@ -103,6 +104,12 @@
       <div id="obj-facts" class="facts"></div>
 
       <div class="block">
+        <div class="block-title">Снимок местности</div>
+        <div id="obj-shot" class="shot"></div>
+        <div id="obj-links" class="shotlinks"></div>
+      </div>
+
+      <div class="block">
         <div class="block-title">Доказательная цепочка <span id="obj-agree" class="pill">—</span></div>
         <div id="obj-signals"></div>
         <p class="muted sm">
@@ -146,6 +153,68 @@
       <p class="muted sm mt"><kbd>Space</kbd> дальше · <kbd>←</kbd> <kbd>→</kbd> навигация</p>
       <div id="story-stats" class="stats"></div>
       <div id="story-rejects" class="hidden"></div>
+    </section>
+
+    <!-- Прогноз -->
+    <section id="pane-forecast" class="pane hidden">
+      <div class="kicker">превентивная экономика</div>
+      <h2>Где свалка появится<br>в следующие 12 месяцев</h2>
+
+      <div class="bigclaim">
+        Убрать свалку стоит миллионы.<br>
+        Не дать ей появиться — стоит знака и фотоловушки.
+      </div>
+
+      <p class="muted">
+        Детектор выдаёт не только факт объекта, но и <b>дату его возникновения</b>.
+        Значит, у нас есть готовая история: где и когда появлялись свалки
+        с 2018 года. Это и есть обучающая выборка — её не надо собирать,
+        она получается побочным продуктом.
+      </p>
+
+      <div class="block">
+        <div class="block-title">Признаки модели</div>
+        <div id="fc-features"></div>
+        <p class="muted sm">
+          Только объяснимые. Каждый защищается фразой «водитель самосвала
+          рассуждает именно так»: доехать легко, увидеть некому, рядом
+          уже свалено.
+        </p>
+      </div>
+
+      <div class="block">
+        <div class="block-title">Как проверялось качество</div>
+        <div class="valid">
+          <div class="valid-bad">
+            <b>Случайное разбиение</b>
+            <span>даёт красивую и неправдивую цифру: соседние ячейки
+            скоррелированы, модель угадывает соседа, ничего не выучив</span>
+          </div>
+          <div class="valid-ok">
+            <b>Валидация по времени</b>
+            <span>обучаемся на объектах до отсечки, проверяемся на
+            возникших после. Ячейки с уже существующими свалками
+            из проверки исключены</span>
+          </div>
+        </div>
+        <p class="muted sm">
+          Метрика получается ниже, чем при случайном разбиении. И она честная.
+        </p>
+      </div>
+
+      <div class="block">
+        <div class="block-title">Зоны риска на карте</div>
+        <div id="fc-classes"></div>
+        <p class="muted sm">
+          Публичная карта показывает <b>класс зоны на укрупнённой сетке</b>,
+          а не точную вероятность по конкретному двору. Причина не
+          техническая: адресная карта риска работала бы как обвинение
+          людей в том, чего они ещё не сделали. Точные координаты
+          и рекомендации по расстановке — в закрытом контуре для службы.
+        </p>
+      </div>
+
+      <button id="fc-show" class="btn solid wide" type="button">Показать зоны риска на карте</button>
     </section>
 
     <!-- Метод -->

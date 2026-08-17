@@ -171,13 +171,18 @@ kbd {
 .row-item.on { background: var(--rust-soft); border-left: 3px solid var(--rust); padding-left: 10px; }
 .ri-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .ri-id { font: 600 13px/1 var(--mono); letter-spacing: .04em; }
-.ri-prob { font: 500 11.5px/1 var(--mono); color: var(--rust); }
+.ri-prob {
+  font: 600 11.5px/1 var(--mono);
+  padding: 3px 6px; border: 1px solid currentColor;
+}
+.ri-prob.hi { color: var(--rust); background: var(--rust-soft); }
+.ri-prob.mid { color: var(--amber); background: #f7efdc; }
+.ri-prob.low { color: var(--ink-3); background: var(--paper-2); }
 .ri-meta {
   display: flex; gap: 12px; margin-top: 5px;
   font: 400 11.5px/1 var(--mono); color: var(--ink-3);
 }
-.ri-bar { height: 2px; background: var(--rule); margin-top: 8px; }
-.ri-bar i { display: block; height: 100%; background: var(--rust); }
+.ri-item-track { margin-top: 8px; }
 
 /* ═══════════ Карта ═══════════ */
 
@@ -288,14 +293,50 @@ kbd {
   padding: 3px 7px; background: var(--rust); color: var(--paper);
 }
 
+/* ─── Шкалы процентов ───────────────────────────────────────────────
+   Дорожка всегда видна на всю ширину — это и есть «сто процентов».
+   Заливка занимает ровно долю значения, поэтому 57% видно как 57%,
+   а не как почти полную полосу.
+
+   Цвет кодирует уверенность:
+     ≥ 60%  красный  — сильный признак
+     < 60%  охра     — слабый
+   Так значение читается ещё до того, как глаз дойдёт до цифры. */
+
+.track {
+  position: relative;
+  height: 7px;
+  background: var(--paper-3);
+  border: 1px solid var(--rule);
+  overflow: hidden;
+}
+.track > i {
+  display: block; height: 100%;
+  background: var(--rust);
+  transition: width .5s ease, background .3s ease;
+}
+.track > i.mid { background: var(--amber); }
+.track > i.low { background: var(--rule); }
+
+/* Деления на 25 / 50 / 75 — без них доля читается хуже */
+.track::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none;
+  background-image: linear-gradient(90deg,
+    transparent 0 calc(25% - 1px), rgba(22,19,15,.16) calc(25% - 1px) 25%,
+    transparent 25% calc(50% - 1px), rgba(22,19,15,.16) calc(50% - 1px) 50%,
+    transparent 50% calc(75% - 1px), rgba(22,19,15,.16) calc(75% - 1px) 75%,
+    transparent 75%);
+}
+
 /* Признаки */
 .sig { margin-bottom: 12px; }
 .sig-l { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; }
-.sig-l .v { font: 500 11.5px/1 var(--mono); color: var(--ink-3); }
-.sig-t { height: 6px; background: var(--paper-3); margin-top: 5px; }
-.sig-f { height: 100%; background: var(--rust); transition: width .5s ease; }
-.sig-f.weak { background: var(--rule); }
-.sig.off .sig-l { color: var(--ink-3); }
+.sig-l .v { font: 600 12px/1 var(--mono); }
+.sig-l .v.hi { color: var(--rust); }
+.sig-l .v.mid { color: var(--amber); }
+.sig-l .v.low { color: var(--ink-3); }
+.sig .track { margin-top: 5px; }
+.sig.off .sig-l span:first-child { color: var(--ink-3); }
 
 /* До/после */
 .ba { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 12px; }
@@ -328,6 +369,73 @@ kbd {
 .st .k { font-size: 13px; color: var(--ink-2); }
 .st .v { font: 400 17px/1 var(--serif); }
 .st.big .v { font-size: 26px; }
+
+/* ─── Снимок местности в карточке ─── */
+.shot {
+  position: relative;
+  width: 100%; aspect-ratio: 3 / 2;
+  background: #14171c;
+  border: 1px solid var(--rule);
+  overflow: hidden;
+}
+.shot .tiles {
+  position: absolute; inset: 0;
+  display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
+}
+.shot .tiles img { width: 100%; height: 100%; display: block; object-fit: cover; }
+.shot .cross {
+  position: absolute; left: 50%; top: 50%;
+  width: 46px; height: 46px; transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.shot .cross::before, .shot .cross::after {
+  content: ''; position: absolute; background: var(--rust);
+}
+.shot .cross::before { left: 50%; top: 0; bottom: 0; width: 2px; margin-left: -1px; }
+.shot .cross::after { top: 50%; left: 0; right: 0; height: 2px; margin-top: -1px; }
+.shot .ring {
+  position: absolute; left: 50%; top: 50%;
+  width: 46px; height: 46px; margin: -23px 0 0 -23px;
+  border: 2px solid var(--rust); border-radius: 50%;
+}
+.shot .cap {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  padding: 5px 8px;
+  background: rgba(20,23,28,.82); color: #cfd5dd;
+  font: 400 10.5px/1.3 var(--mono);
+}
+.shotlinks { display: flex; gap: 8px; margin-top: 8px; }
+.shotlinks a {
+  flex: 1; text-align: center;
+  padding: 7px 8px;
+  border: 1px solid var(--rule);
+  font-size: 12px; text-decoration: none; color: var(--ink-2);
+}
+.shotlinks a:hover { border-color: var(--rust); color: var(--rust); }
+
+/* ─── Панель прогноза ─── */
+.tab.accent { color: var(--rust); }
+.tab.accent.active { border-bottom-color: var(--rust); }
+
+.bigclaim {
+  margin: 4px 0 16px;
+  padding: 16px 18px;
+  background: var(--ink); color: var(--paper);
+  font: 400 17px/1.45 var(--serif);
+}
+
+.fcf { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--rule-soft); font-size: 13px; }
+.fcf .n { font: 500 11px/1 var(--mono); color: var(--rust); width: 18px; flex: none; }
+
+.valid { display: flex; flex-direction: column; gap: 8px; }
+.valid-bad, .valid-ok { padding: 11px 13px; border-left: 3px solid; }
+.valid-bad { border-color: var(--ink-3); background: var(--paper-2); }
+.valid-ok { border-color: var(--moss); background: #eef3ec; }
+.valid b { display: block; font-size: 13px; margin-bottom: 4px; }
+.valid span { font-size: 12.5px; color: var(--ink-2); line-height: 1.5; }
+
+.rclass { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 13px; }
+.rclass .sw { width: 26px; height: 12px; border: 1px solid rgba(0,0,0,.2); flex: none; }
 
 /* Метод */
 .method { margin-top: 6px; }

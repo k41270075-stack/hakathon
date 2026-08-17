@@ -132,19 +132,30 @@ function toast(text, kind = '', ms = 5000) {
 
 // ═════════════════════════ Карта ═════════════════════════
 
+//: Границы масштаба. Без них карту можно отдалить до всей планеты
+//: (объекты схлопываются в точку, выглядит как поломка) или приблизить
+//: за предел доступных тайлов (подложка становится серой).
+const MIN_ZOOM = 8;
+const MAX_ZOOM = 18;
+
 function initMap() {
   map = L.map('map', {
     zoomControl: true,
     attributionControl: true,
     preferCanvas: true,          // canvas-рендерер: десятки полигонов
     worldCopyJump: false,        // без «телепорта» через антимеридиан
+    minZoom: MIN_ZOOM,
+    maxZoom: MAX_ZOOM,
+    zoomSnap: 0.5,               // мягче шаг зума колесом
+    maxBoundsViscosity: 0.7,     // край области «пружинит», а не обрывается
   }).setView([51.17, 71.45], 10);
 
   const bases = {};
-  for (const [key, cfg] of Object.entries(BASEMAPS)) {
+  for (const cfg of Object.values(BASEMAPS)) {
     bases[cfg.label] = L.tileLayer(cfg.url, {
       attribution: cfg.attribution,
-      maxZoom: 19,
+      minZoom: MIN_ZOOM,
+      maxZoom: MAX_ZOOM,
       // Держим тайлы соседних зумов: при быстром зуме карта не белеет
       keepBuffer: 3,
     });
@@ -235,6 +246,14 @@ function fitAll() {
   map.fitBounds(L.latLngBounds(pts).pad(0.15), { animate: true });
 }
 
+/** Ограничить перемещение областью данных с запасом.
+ *  Иначе пользователь уезжает в океан и не понимает, куда делись объекты. */
+function lockBounds() {
+  const pts = state.features.map((f) => polygonCenter(f));
+  if (!pts.length) return;
+  map.setMaxBounds(L.latLngBounds(pts).pad(1.2));
+}
+
 function showRisk(on) {
   if (on) { map.addLayer(layerRisk); } else { map.removeLayer(layerRisk); }
 }
@@ -271,9 +290,11 @@ async function boot() {
 
   addLayers();
   fitAll();
+  lockBounds();
   renderLegend();
   renderList();
   renderStats('welcome-stats');
+  renderForecast();
 
   el('demo-flag').classList.toggle('hidden', !state.isDemo);
   if (state.isDemo) {
@@ -302,6 +323,20 @@ function applyFilters() {
   });
 }
 
+/** Класс по величине: ≥60% красный, 30–60% охра, ниже — серый.
+ *  Цвет должен читаться раньше цифры. */
+function levelClass(percent) {
+  if (percent >= 60) return 'hi';
+  if (percent >= 30) return 'mid';
+  return 'low';
+}
+
+/** Шкала: дорожка всегда на всю ширину, заливка — ровно доля значения. */
+function trackHtml(percent) {
+  const p = Math.max(0, Math.min(100, Math.round(percent)));
+  return `<div class="track"><i class="${levelClass(p)}" style="width:${p}%"></i></div>`;
+}
+
 function renderList() {
   applyFilters();
   const selectedId = state.selected?.properties?.candidate_id;
@@ -312,14 +347,14 @@ function renderList() {
     return `<div class="row-item${p.candidate_id === selectedId ? ' on' : ''}" data-id="${p.candidate_id}">
       <div class="ri-top">
         <span class="ri-id">${p.candidate_id}</span>
-        ${prob != null ? `<span class="ri-prob">${prob}%</span>` : ''}
+        ${prob != null ? `<span class="ri-prob ${levelClass(prob)}">${prob}%</span>` : ''}
       </div>
       <div class="ri-meta">
         <span>${num(p.area_m2)} м²</span>
         <span>${kzt(p.damage_p50)}</span>
         <span>${p.break_date ? String(p.break_date).slice(0, 4) : '—'}</span>
       </div>
-      <div class="ri-bar"><i style="width:${prob ?? 0}%"></i></div>
+      <div class="ri-item-track">${trackHtml(prob ?? 0)}</div>
     </div>`;
   }).join('') || '<div class="pane muted sm">Ничего не найдено</div>';
 
@@ -356,7 +391,7 @@ function renderStats(target) {
 // ═════════════════════════ Карточка объекта ═════════════════════════
 
 function showPane(name) {
-  for (const id of ['welcome', 'object', 'story', 'method']) {
+  for (const id of ['welcome', 'object', 'story', 'method', 'forecast']) {
     el(`pane-${id}`).classList.toggle('hidden', id !== name);
   }
 }
@@ -384,7 +419,8 @@ function closeObject() {
     const node = m.pin.getElement()?.querySelector('.obj-pin');
     if (node) node.classList.remove('on');
   });
-  showPane(state.tab === 'story' ? 'story' : state.tab === 'method' ? 'method' : 'welcome');
+  const back = { story: 'story', method: 'method', forecast: 'forecast' }[state.tab] || 'welcome';
+  showPane(back);
   renderList();
 }
 
@@ -407,14 +443,16 @@ function renderObject(f) {
     <div class="fact"><div class="k">Уверенность</div><div class="v">${p.probability != null ? Math.round(p.probability * 100) + '%' : '—'}</div></div>
     <div class="fact wide"><div class="k">Координаты</div><div class="v">${c[0].toFixed(6)}, ${c[1].toFixed(6)}</div></div>`;
 
+  renderSnapshot(f, c);
+
   let agree = 0;
   el('obj-signals').innerHTML = SIGNALS.map(([key, label, full]) => {
     const raw = Number(p[key]);
-    const s = Number.isFinite(raw) ? Math.max(0, Math.min(1, raw / full)) : 0;
-    if (s >= 0.3) agree++;
-    return `<div class="sig${s < 0.3 ? ' off' : ''}">
-      <div class="sig-l"><span>${label}</span><span class="v">${Math.round(s * 100)}%</span></div>
-      <div class="sig-t"><div class="sig-f${s < 0.3 ? ' weak' : ''}" style="width:${s * 100}%"></div></div>
+    const pct = Math.round(Number.isFinite(raw) ? Math.max(0, Math.min(1, raw / full)) * 100 : 0);
+    if (pct >= 30) agree++;
+    return `<div class="sig${pct < 30 ? ' off' : ''}">
+      <div class="sig-l"><span>${label}</span><span class="v ${levelClass(pct)}">${pct}%</span></div>
+      ${trackHtml(pct)}
     </div>`;
   }).join('');
   el('obj-agree').textContent = `${agree} из 5`;
@@ -446,6 +484,45 @@ function renderObject(f) {
     <div class="f">${kzt(p.penalty_kzt)}</div>`;
 }
 
+/** Снимок местности: мозаика 3×3 спутниковых тайлов вокруг объекта.
+ *
+ *  Это не «фотография» в смысле уличной панорамы, а снимок сверху —
+ *  и на защите это надо называть своими словами. Панорам за городом
+ *  почти нет, а спутниковый тайл на зуме 17 даёт около 0.7 м на пиксель:
+ *  видны колеи техники и отдельные крупные предметы.
+ *
+ *  Тайлы те же, что у подложки, поэтому они уже в кеше и работают офлайн.
+ */
+function renderSnapshot(feature, center) {
+  const [lat, lon] = center;
+  const z = 17;
+  const n = 2 ** z;
+  const cx = Math.floor(((lon + 180) / 360) * n);
+  const rad = (lat * Math.PI) / 180;
+  const cy = Math.floor(((1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2) * n);
+
+  const cells = [];
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const url = BASEMAPS.sat.url
+        .replace('{z}', z).replace('{x}', cx + dx).replace('{y}', cy + dy);
+      cells.push(`<img src="${url}" alt="" loading="lazy">`);
+    }
+  }
+
+  el('obj-shot').innerHTML = `
+    <div class="tiles">${cells.join('')}</div>
+    <div class="ring"></div>
+    <div class="cross"></div>
+    <div class="cap">Esri World Imagery · зум ${z} · примерно 0.7 м на пиксель</div>`;
+
+  // Внешние карты: там есть панорамы и свежая съёмка, которых у нас нет.
+  el('obj-links').innerHTML = `
+    <a href="https://yandex.ru/maps/?ll=${lon},${lat}&z=18&l=sat" target="_blank" rel="noopener">Яндекс Карты</a>
+    <a href="https://www.google.com/maps/@${lat},${lon},18z/data=!3m1!1e3" target="_blank" rel="noopener">Google Maps</a>
+    <a href="https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=18/${lat}/${lon}" target="_blank" rel="noopener">OSM</a>`;
+}
+
 el('obj-close').onclick = closeObject;
 el('obj-act').onclick = (e) => {
   const b = e.currentTarget;
@@ -459,18 +536,56 @@ el('obj-act').onclick = (e) => {
 
 function setTab(name) {
   state.tab = name;
-  el('tab-map').classList.toggle('active', name === 'map');
-  el('tab-story').classList.toggle('active', name === 'story');
-  el('tab-method').classList.toggle('active', name === 'method');
+  for (const t of ['map', 'forecast', 'story', 'method']) {
+    el(`tab-${t}`).classList.toggle('active', t === name);
+  }
 
-  if (name === 'story') { setScene(state.scene); }
-  else if (name === 'method') { showPane('method'); }
+  if (name === 'story') setScene(state.scene);
+  else if (name === 'method') showPane('method');
+  else if (name === 'forecast') { showPane('forecast'); showRisk(true); }
   else { showPane(state.selected ? 'object' : 'welcome'); renderStats('welcome-stats'); }
 }
 
 el('tab-map').onclick = () => setTab('map');
+el('tab-forecast').onclick = () => setTab('forecast');
 el('tab-story').onclick = () => setTab('story');
 el('tab-method').onclick = () => setTab('method');
+
+// ═════════════════════════ Прогноз ═════════════════════════
+
+const FORECAST_FEATURES = [
+  'расстояние до проезжей дороги — без подъезда свалка не образуется',
+  'удалённость от жилья — ближе заметят, дальше невыгодно везти',
+  'расстояние до легального полигона',
+  'плотность существующих свалок в радиусе 3 и 10 км',
+  'расстояние до ближайшей известной свалки',
+  'укрытость от глаз: подъезд близко, жильё далеко',
+];
+
+const RISK_CLASSES = [
+  [4, '#b84a1f', 'Высокий — сюда ставить знак и фотоловушку в первую очередь'],
+  [3, '#c96a1c', 'Повышенный'],
+  [2, '#b07a12', 'Умеренный'],
+];
+
+function renderForecast() {
+  el('fc-features').innerHTML = FORECAST_FEATURES
+    .map((text, i) => `<div class="fcf"><span class="n">${i + 1}</span><span>${text}</span></div>`)
+    .join('');
+
+  el('fc-classes').innerHTML = RISK_CLASSES
+    .map(([, color, label]) =>
+      `<div class="rclass"><span class="sw" style="background:${color}"></span>${label}</div>`)
+    .join('');
+}
+
+el('fc-show').onclick = () => {
+  showRisk(true);
+  map.removeLayer(layerCandidates);
+  fitAll();
+  toast('Слой зон риска включён. Объекты скрыты, чтобы не мешали.', '', 5000);
+  setTimeout(() => map.addLayer(layerCandidates), 4000);
+};
 
 // ═════════════════════════ Сценарий ═════════════════════════
 
@@ -632,7 +747,21 @@ el('btn-offline').onclick = async () => {
   toast(`Готово: ${done} тайлов в кеше. Карта откроется без сети.`, 'ok', 7000);
 };
 
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+
+  // Без этого пользователь после выката новой версии продолжает видеть
+  // старую и не понимает, почему «ничего не изменилось».
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    if (event.data?.type !== 'updated') return;
+    const node = document.createElement('div');
+    node.className = 'toast ok';
+    node.innerHTML = 'Вышла новая версия интерфейса. ' +
+      '<button class="link" style="color:inherit">Обновить</button>';
+    node.querySelector('button').onclick = () => location.reload();
+    el('toasts').appendChild(node);
+  });
+}
 
 // ═════════════════════════ Старт ═════════════════════════
 
