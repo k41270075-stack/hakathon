@@ -200,5 +200,63 @@ def scenes(
         console.print(f"Сохранено: [green]{output}[/green]")
 
 
+@app.command()
+def money(
+    area: float = typer.Argument(..., help="Площадь свалки, м²"),
+    depth: str = typer.Option("medium", "--depth", help="Класс глубины: shallow | medium | deep"),
+    distance: float = typer.Option(15.0, "--distance", help="Расстояние до полигона, км"),
+    violator: str = typer.Option(
+        "individual",
+        "--violator",
+        help="Категория нарушителя: individual | official_or_small | medium | large",
+    ),
+    show_sensitivity: bool = typer.Option(
+        False, "--sensitivity", help="Показать вклад допущений в разброс"
+    ),
+) -> None:
+    """Оценить ущерб от одного объекта.
+
+    Результат — диапазон P10…P90, а не одна цифра: в расчёте участвуют
+    восемь величин, известных лишь приблизительно, и честный интервал
+    переживает вопрос «откуда цифра», а точечная оценка — нет.
+    """
+    from .money import assess
+    from .money import sensitivity as compute_sensitivity
+
+    econ = load_economics()
+    result = assess(
+        area,
+        econ,
+        depth_class=depth,  # type: ignore[arg-type]
+        distance_to_landfill_km=distance,
+        violator=violator,  # type: ignore[arg-type]
+    )
+
+    table = Table(title=f"Оценка ущерба: {area:,.0f} м²".replace(",", " "), show_header=False)
+    table.add_column("", style="cyan", no_wrap=True)
+    table.add_column("")
+    for line in result.summary_lines():
+        key, _, value = line.partition(": ")
+        table.add_row(key, value)
+    console.print(table)
+    console.print(
+        f"[dim]Монте-Карло, {result.iterations:,} итераций; "
+        f"штраф считается отдельно и не входит в ущерб[/dim]".replace(",", " ")
+    )
+
+    if show_sensitivity:
+        sens = compute_sensitivity(area, econ, depth_class=depth)  # type: ignore[arg-type]
+        stable = Table(title="Вклад допущений в разброс", show_header=True)
+        stable.add_column("Допущение", style="cyan")
+        stable.add_column("Корреляция с итогом", justify="right")
+        for name, value in sorted(sens.items(), key=lambda kv: -abs(kv[1])):
+            stable.add_row(name, f"{value:+.2f}")
+        console.print(stable)
+        console.print(
+            "[dim]Чем выше по модулю — тем сильнее эта величина определяет разброс "
+            "и тем важнее уточнить её реальными данными.[/dim]"
+        )
+
+
 if __name__ == "__main__":  # pragma: no cover
     app()
