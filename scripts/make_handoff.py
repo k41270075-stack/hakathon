@@ -1,9 +1,13 @@
-"""Справка для нового участника: PDF на две страницы.
+"""Справка для нового участника: PDF на три страницы.
 
 Зачем отдельный документ, если есть README. README читают, когда уже
 решили разбираться. Эту справку отправляют человеку, который ещё не
 знает, что за проект и стоит ли в него влезать: ссылки, суть, список
-задач — всё на двух страницах, без прокрутки по репозиторию.
+задач — всё в одном файле, без прокрутки по репозиторию.
+
+Вёрстка идёт потоком с автоматическим переносом страниц. Ручное
+управление страницами тут уже приводило к тому, что текст молча
+уезжал под подвал: reportlab не считает это ошибкой.
 
 Запуск:
     python scripts/make_handoff.py
@@ -24,7 +28,6 @@ from vantage.act import register_cyrillic_font  # noqa: E402
 REPO_URL = "https://github.com/k41270075-stack/hakathon"
 SITE_URL = "https://hakathon-amber-three.vercel.app/"
 
-# Палитра та же, что на сайте: бумага, чернила, охра
 PAPER = (0.969, 0.957, 0.937)
 INK = (0.086, 0.075, 0.059)
 INK_2 = (0.29, 0.267, 0.235)
@@ -49,20 +52,43 @@ def build() -> Path:
 
     margin = 18 * mm
     right = width - margin
-    state = {"y": height - margin}
+    top = height - margin
+    floor = 20 * mm          # ниже этой отметки начинается подвал
 
-    # ---------- примитивы ---------- #
+    state = {"y": top, "page": 1}
 
-    def paper_bg():
+    # ------------------------------------------------------------------ #
+    #  Примитивы вёрстки
+    # ------------------------------------------------------------------ #
+
+    def paint_page():
         pdf.setFillColor(Color(*PAPER))
         pdf.rect(0, 0, width, height, stroke=0, fill=1)
 
+    def footer():
+        pdf.setFillColor(Color(*INK_3))
+        pdf.setFont(font, 7.4)
+        pdf.drawString(margin, 12 * mm, "VANTAGE · Future Minds Hackathon 2026 · трек EcoFin")
+        pdf.drawRightString(right, 12 * mm, str(state["page"]))
+
+    def new_page():
+        footer()
+        pdf.showPage()
+        state["page"] += 1
+        state["y"] = top
+        paint_page()
+
+    def need(space_mm: float):
+        """Перенести на новую страницу, если блок не помещается целиком."""
+        if state["y"] - space_mm * mm < floor:
+            new_page()
+
     def wrap(text: str, size: float, max_width: float, use_bold=False) -> list[str]:
-        pdf.setFont(bold if use_bold else font, size)
+        face = bold if use_bold else font
         words, lines, cur = text.split(), [], ""
         for w in words:
             probe = f"{cur} {w}".strip()
-            if pdf.stringWidth(probe, bold if use_bold else font, size) <= max_width:
+            if pdf.stringWidth(probe, face, size) <= max_width:
                 cur = probe
             else:
                 if cur:
@@ -72,15 +98,18 @@ def build() -> Path:
             lines.append(cur)
         return lines
 
-    def text(body: str, *, size=9.6, color=INK_2, gap=4.6, indent=0.0, use_bold=False):
+    def para(body: str, *, size=9.6, color=INK_2, indent=0.0, use_bold=False, lead=4.6):
+        lines = wrap(body, size, right - margin - indent, use_bold)
+        need(len(lines) * lead + 2)
         pdf.setFillColor(Color(*color))
-        for line in wrap(body, size, right - margin - indent, use_bold):
-            pdf.setFont(bold if use_bold else font, size)
+        pdf.setFont(bold if use_bold else font, size)
+        for line in lines:
             pdf.drawString(margin + indent, state["y"], line)
-            state["y"] -= gap * mm
-        state["y"] -= 0.8 * mm
+            state["y"] -= lead * mm
+        state["y"] -= 1 * mm
 
     def heading(label: str, number: str = ""):
+        need(16)
         state["y"] -= 3 * mm
         if number:
             pdf.setFillColor(Color(*RUST))
@@ -95,7 +124,19 @@ def build() -> Path:
         pdf.line(margin, state["y"], right, state["y"])
         state["y"] -= 6 * mm
 
+    def subheading(label: str, color=INK_3):
+        # Резервируем место не только под сам подзаголовок, но и под первый
+        # блок под ним: иначе заголовок остаётся сиротой в самом низу
+        # страницы, а то, что он озаглавливает, уезжает на следующую.
+        need(30)
+        state["y"] -= 1 * mm
+        pdf.setFillColor(Color(*color))
+        pdf.setFont(bold, 8.6)
+        pdf.drawString(margin, state["y"], label)
+        state["y"] -= 6.5 * mm
+
     def link_row(label: str, url: str):
+        need(8)
         pdf.setFillColor(Color(*INK_3))
         pdf.setFont(font, 8.6)
         pdf.drawString(margin, state["y"], label)
@@ -105,20 +146,52 @@ def build() -> Path:
         pdf.linkURL(url, (margin + 30 * mm, state["y"] - 2, right, state["y"] + 10), relative=0)
         state["y"] -= 6.4 * mm
 
+    def bullet(title: str, detail: str):
+        lines = wrap(detail, 8.4, right - margin - 5 * mm)
+        need(len(lines) * 3.9 + 6)
+        pdf.setFillColor(Color(*RUST))
+        pdf.circle(margin + 1.4 * mm, state["y"] + 1 * mm, 1.1 * mm, stroke=0, fill=1)
+        pdf.setFillColor(Color(*INK))
+        pdf.setFont(bold, 9)
+        pdf.drawString(margin + 5 * mm, state["y"], title)
+        state["y"] -= 4 * mm
+        pdf.setFillColor(Color(*INK_2))
+        pdf.setFont(font, 8.4)
+        for line in lines:
+            pdf.drawString(margin + 5 * mm, state["y"], line)
+            state["y"] -= 3.9 * mm
+        state["y"] -= 1.8 * mm
+
+    def component(name: str, detail: str):
+        lines = wrap(detail, 8.6, right - margin - 4 * mm)
+        need(len(lines) * 3.9 + 7)
+        pdf.setFillColor(Color(*INK))
+        pdf.setFont(bold, 9.4)
+        pdf.drawString(margin, state["y"], name)
+        state["y"] -= 4.2 * mm
+        pdf.setFillColor(Color(*INK_2))
+        pdf.setFont(font, 8.6)
+        for line in lines:
+            pdf.drawString(margin + 4 * mm, state["y"], line)
+            state["y"] -= 3.9 * mm
+        state["y"] -= 2 * mm
+
     def task(number: str, title: str, detail: str, where: str = "", blocking=False):
+        lines = wrap(detail, 8.8, right - margin - 8 * mm)
+        need(len(lines) * 3.9 + (4 if where else 0) + 10)
         box_top = state["y"] + 4 * mm
+
         pdf.setFillColor(Color(*(RUST if blocking else INK_3)))
         pdf.setFont(bold, 9)
         pdf.drawString(margin, state["y"], number)
-
         pdf.setFillColor(Color(*INK))
         pdf.setFont(bold, 9.8)
         pdf.drawString(margin + 8 * mm, state["y"], title)
         state["y"] -= 4.4 * mm
 
         pdf.setFillColor(Color(*INK_2))
-        for line in wrap(detail, 8.8, right - margin - 8 * mm):
-            pdf.setFont(font, 8.8)
+        pdf.setFont(font, 8.8)
+        for line in lines:
             pdf.drawString(margin + 8 * mm, state["y"], line)
             state["y"] -= 3.9 * mm
 
@@ -135,15 +208,11 @@ def build() -> Path:
 
         state["y"] -= 2.4 * mm
 
-    def footer(page: int):
-        pdf.setFillColor(Color(*INK_3))
-        pdf.setFont(font, 7.4)
-        pdf.drawString(margin, 12 * mm, "VANTAGE · Future Minds Hackathon 2026 · трек EcoFin · Астана")
-        pdf.drawRightString(right, 12 * mm, f"{page} / 2")
+    # ================================================================== #
+    #  Содержание
+    # ================================================================== #
 
-    # ================= СТРАНИЦА 1 ================= #
-
-    paper_bg()
+    paint_page()
 
     pdf.setFillColor(Color(*RUST))
     pdf.setFont(bold, 8)
@@ -154,8 +223,8 @@ def build() -> Path:
     pdf.setFont(bold, 30)
     pdf.drawString(margin, state["y"], "VANTAGE")
     state["y"] -= 8 * mm
-    pdf.setFont(font, 13)
     pdf.setFillColor(Color(*INK_2))
+    pdf.setFont(font, 13)
     pdf.drawString(margin, state["y"], "Поиск несанкционированных свалок по спутниковым снимкам")
     state["y"] -= 11 * mm
 
@@ -164,106 +233,88 @@ def build() -> Path:
     pdf.line(margin, state["y"], margin + 40 * mm, state["y"])
     state["y"] -= 9 * mm
 
-    # ---- Ссылки ---- #
     link_row("Репозиторий", REPO_URL)
     link_row("Сайт", SITE_URL)
     state["y"] -= 2 * mm
 
-    # ---- О чём проект ---- #
+    # ---------- О чём проект ---------- #
     heading("О чём проект", "01")
-    text(
-        "Вокруг любого города есть свалки, о которых власти не знают: их никто не считал, "
-        "потому что никто не видел. Обойти степь пешком невозможно, дроны не покрывают такую площадь."
-    )
-    text(
-        "Мы берём бесплатные спутниковые снимки за восемь лет и ищем места, где поверхность "
-        "изменилась необратимо: растительность исчезла и не вернулась, появился открытый грунт. "
-        "Для каждой находки считаем координаты, месяц возникновения, массу отходов, стоимость "
-        "уборки в тенге и применимую статью КоАП — и складываем это в готовый черновик акта."
-    )
-    text(
-        "Отдельно система предсказывает, где свалка появится в следующие 12 месяцев. "
-        "Убрать свалку стоит миллионы; не дать ей появиться — стоит дорожного знака.",
-        use_bold=True, color=INK,
-    )
+    para("Вокруг любого города есть свалки, о которых власти не знают: их никто не считал, "
+         "потому что никто не видел. Обойти степь пешком невозможно, дроны не покрывают "
+         "такую площадь, а находят объект обычно по жалобе — то есть поздно.")
+    para("Мы берём бесплатные спутниковые снимки за восемь лет и ищем места, где поверхность "
+         "изменилась необратимо: растительность исчезла и не вернулась, появился открытый грунт. "
+         "Для каждой находки считаем координаты, месяц возникновения, массу отходов, стоимость "
+         "уборки в тенге и применимую статью КоАП — и складываем это в готовый черновик акта.")
+    para("Отдельно система предсказывает, где свалка появится в следующие 12 месяцев. "
+         "Убрать свалку стоит миллионы; не дать ей появиться — стоит дорожного знака.",
+         use_bold=True, color=INK)
 
-    # ---- Как отличаем ---- #
+    # ---------- Пять признаков ---------- #
     heading("Главная сложность", "02")
-    text(
-        "На снимке с разрешением 10 метров свалка выглядит как серое пятно — ровно как карьер, "
-        "стройплощадка или отвал грунта. Различает их не картинка, а комбинация пяти физических признаков:"
-    )
+    para("На снимке с разрешением 10 метров свалка выглядит как серое пятно — ровно как карьер, "
+         "стройплощадка или отвал грунта. Различает их не картинка, а комбинация пяти "
+         "физических признаков:")
 
-    signals = [
-        ("Падение NDVI без возврата", "растительность гибнет навсегда", "отсекает пашню: там NDVI возвращается весной"),
-        ("Рост индекса открытого грунта", "поверхность становится минеральной", "отсекает застройку"),
-        ("Отклик в коротковолновом ИК", "полимеры имеют характерное поглощение", "отсекает чистый грунт"),
-        ("Нестабильность по радару", "поверхность меняется от съёмки к съёмке", "отсекает КАРЬЕР: его стенки стабильны"),
-        ("Тепловая аномалия", "гниющая органика греет тело свалки", "отсекает СНЕГОСВАЛКУ: она холоднее фона"),
-    ]
-    for name, physics, cuts in signals:
-        pdf.setFillColor(Color(*RUST))
-        pdf.circle(margin + 1.4 * mm, state["y"] + 1 * mm, 1.1 * mm, stroke=0, fill=1)
-        pdf.setFillColor(Color(*INK))
-        pdf.setFont(bold, 9)
-        pdf.drawString(margin + 5 * mm, state["y"], name)
-        state["y"] -= 4 * mm
-        pdf.setFillColor(Color(*INK_2))
-        pdf.setFont(font, 8.4)
-        pdf.drawString(margin + 5 * mm, state["y"], f"{physics} · {cuts}")
-        state["y"] -= 5.6 * mm
+    for name, detail in [
+        ("Падение NDVI без возврата",
+         "растительность гибнет навсегда · отсекает пашню: там NDVI возвращается каждую весну"),
+        ("Рост индекса открытого грунта",
+         "поверхность становится минеральной · отсекает плотную застройку"),
+        ("Отклик в коротковолновом ИК",
+         "полимеры имеют характерное поглощение · отсекает чистый грунт"),
+        ("Нестабильность по радару",
+         "поверхность меняется от съёмки к съёмке · отсекает КАРЬЕР: его стенки стабильны неделями"),
+        ("Тепловая аномалия",
+         "гниющая органика греет тело свалки · отсекает СНЕГОСВАЛКУ: она холоднее фона"),
+    ]:
+        bullet(name, detail)
 
-    state["y"] -= 1 * mm
-    text(
-        "Модель не выдаёт вердикт «свалка / не свалка». Она показывает, какие признаки сработали "
-        "и насколько сильно. Решение принимает человек.",
-        use_bold=True, color=INK,
-    )
+    para("Модель не выдаёт вердикт «свалка / не свалка». Она показывает, какие признаки "
+         "сработали и насколько сильно. Решение принимает человек.",
+         use_bold=True, color=INK)
 
-    # ---- Состояние ---- #
-    heading("В каком состоянии проект сейчас", "03")
-    text(
-        "Код написан целиком: 495 тестов, все модули на месте, сайт развёрнут. "
-        "Но на карте сейчас ВЫДУМАННЫЕ объекты — генератор случайных точек для отладки интерфейса. "
-        "Они помечены красной плашкой «демо-данные».",
-        color=INK,
-    )
-    text(
-        "Чтобы появились настоящие находки, нужно разметить обучающую выборку и запустить полный "
-        "прогон по Астане. Это первые две задачи на следующей странице."
-    )
+    # ---------- Из чего состоит ---------- #
+    heading("Из чего состоит система", "03")
 
-    footer(1)
-    pdf.showPage()
+    component("Карта",
+              "лендинг и приложение: список объектов, снимки «было и стало» за разные годы, "
+              "таймлайн появления, зоны риска, обучающий тур. Работает без интернета.")
+    component("Telegram-бот",
+              "двусторонний. Наружу — оповещения службе о новых объектах. Внутрь — сообщения "
+              "жителей с фото и геолокацией. Каждое сверяется со спутниковыми находками: "
+              "совпало — независимое подтверждение, не совпало — объект, которого спутник не "
+              "увидел. Именно это закрывает главное ограничение системы: слепоту к объектам "
+              "меньше 30–50 квадратных метров. Идентификатор отправителя не хранится, "
+              "только необратимый хеш.")
+    component("HTTP-сервис",
+              "ролевой доступ. Житель видит зону риска без координат, служба — точку и акт. "
+              "Оператор вывоза не может подтверждать акты: у него коммерческий интерес "
+              "в объёме работ. Каждое обращение к адресным данным пишется в журнал.")
+    component("Генератор актов",
+              "готовый PDF со статусом «черновик». Официальным документ становится только "
+              "после подтверждения человеком — с именем и должностью.")
 
-    # ================= СТРАНИЦА 2 ================= #
+    # ---------- Состояние ---------- #
+    heading("В каком состоянии проект сейчас", "04")
+    para("Код написан целиком: 495 тестов, все модули на месте, сайт развёрнут, "
+         "экономические цифры имеют источники.", color=INK)
+    para("Но на карте сейчас ВЫДУМАННЫЕ объекты — генератор случайных точек для отладки "
+         "интерфейса. Они помечены красной плашкой «демо-данные». Чтобы появились настоящие "
+         "находки, нужно разметить обучающую выборку и запустить полный прогон по Астане. "
+         "Это первые две задачи ниже.", color=INK, use_bold=True)
 
-    paper_bg()
-    state["y"] = height - margin
+    # ---------- Задачи ---------- #
+    heading("Что не сделано", "05")
+    para("Полный список с примерами кода — в файле docs/TODO.md")
 
-    pdf.setFillColor(Color(*RUST))
-    pdf.setFont(bold, 8)
-    pdf.drawString(margin, state["y"], "ЧТО НЕ СДЕЛАНО")
-    state["y"] -= 9 * mm
-    pdf.setFillColor(Color(*INK))
-    pdf.setFont(bold, 18)
-    pdf.drawString(margin, state["y"], "Задачи")
-    state["y"] -= 6 * mm
-    pdf.setFillColor(Color(*INK_2))
-    pdf.setFont(font, 9.2)
-    pdf.drawString(margin, state["y"], "Полный список с примерами кода — в файле docs/TODO.md")
-    state["y"] -= 9 * mm
-
-    pdf.setFillColor(Color(*RUST))
-    pdf.setFont(bold, 9)
-    pdf.drawString(margin, state["y"], "БЛОКИРУЕТ ВСЁ ОСТАЛЬНОЕ")
-    state["y"] -= 7 * mm
+    subheading("БЛОКИРУЕТ ВСЁ ОСТАЛЬНОЕ", RUST)
 
     task("1", "Разметить обучающую выборку", blocking=True,
-         detail="Часть меток берётся из OpenStreetMap автоматически: полигоны ТБО как положительные "
-                "примеры, карьеры и стройки как отрицательные. Остальное надо просмотреть глазами "
-                "и проставить 0 или 1.",
-         where="src/vantage/labels.py · функция harvest_labels и manual_queue")
+         detail="Часть меток берётся из OpenStreetMap автоматически: полигоны ТБО как "
+                "положительные примеры, карьеры и стройки как отрицательные. Остальное надо "
+                "просмотреть глазами и проставить 0 или 1.",
+         where="src/vantage/labels.py · harvest_labels и manual_queue")
 
     task("2", "Запустить настоящий прогон по Астане", blocking=True,
          detail="Пайплайн собран, но полный прогон по области не запускался: нужна потайловая "
@@ -271,16 +322,12 @@ def build() -> Path:
          where="src/vantage/pipeline.py")
 
     task("3", "Сделать страницу для ручной разметки",
-         detail="Самое полезное, что можно добавить прямо сейчас: показывать два снимка «до и после», "
-                "три кнопки — свалка, не свалка, непонятно — и писать результат в файл. "
+         detail="Самое полезное, что можно добавить прямо сейчас: показывать два снимка «до и "
+                "после», три кнопки — свалка, не свалка, непонятно — и писать результат в файл. "
                 "Ускорит задачу 1 в разы.",
          where="новая страница в web/")
 
-    state["y"] -= 2 * mm
-    pdf.setFillColor(Color(*INK_3))
-    pdf.setFont(bold, 9)
-    pdf.drawString(margin, state["y"], "МОДУЛИ ГОТОВЫ, НО НЕ СОЕДИНЕНЫ В ЦЕПОЧКУ")
-    state["y"] -= 7 * mm
+    subheading("МОДУЛИ ГОТОВЫ, НО НЕ СОЕДИНЕНЫ В ЦЕПОЧКУ")
 
     task("4", "Радар и тепло не влияют на решение",
          detail="Оба признака считаются, но детектор изменений использует только два оптических. "
@@ -289,7 +336,7 @@ def build() -> Path:
 
     task("5", "Доверификация не вызывается из пайплайна",
          detail="Модуль умеет тянуть снимки высокого разрешения от нескольких провайдеров и "
-                "оценивать текстуру, но по-настоящему на реальных объектах не запускался.",
+                "оценивать текстуру, но на реальных объектах не запускался ни разу.",
          where="src/vantage/verify.py")
 
     task("6", "Контроль устранения не получает данных",
@@ -297,38 +344,44 @@ def build() -> Path:
                 "но пайплайн не собирает историю наблюдений после даты обнаружения.",
          where="src/vantage/removal.py")
 
-    state["y"] -= 2 * mm
-    pdf.setFillColor(Color(*INK_3))
-    pdf.setFont(bold, 9)
-    pdf.drawString(margin, state["y"], "ДАННЫЕ, КОТОРЫЕ НЕ ДОБЫТЬ КОДОМ")
-    state["y"] -= 7 * mm
+    subheading("РАЗВЁРНУТО НЕ ВСЁ")
 
-    task("7", "Узнать тариф вывоза за тонну по Астане",
+    task("7", "Запустить Telegram-бота",
+         detail="Код готов и покрыт тестами, но бот нигде не работает: нужен токен от @BotFather. "
+                "Скрипт настройки читает токен так, что он не попадает ни в файлы, ни в историю "
+                "команд. Fly.io выбран потому, что бесплатные хостинги усыпляют контейнер без "
+                "входящих запросов, а бот их не получает: он сам ходит в Telegram.",
+         where="deploy/setup-bot.ps1 · инструкция в deploy/README.md")
+
+    task("8", "Развернуть HTTP-сервис (по желанию)",
+         detail="Отложено осознанно: сервис отдаёт точные координаты и суммы ущерба, публиковать "
+                "их в открытый доступ до защиты незачем. Кнопка «черновик акта» на сайте пока "
+                "печатает документ прямо в браузере, без сервера.",
+         where="deploy/Dockerfile, цель api")
+
+    subheading("ДАННЫЕ, КОТОРЫЕ НЕ ДОБЫТЬ КОДОМ")
+
+    task("9", "Узнать тариф вывоза за тонну по Астане",
          detail="82% разброса в оценке ущерба даёт именно этот параметр. Один звонок оператору "
                 "сузит все цифры сильнее, чем уточнение всех остальных величин вместе взятых. "
                 "Сейчас стоит оценка, выведенная из тарифа Алматы.",
          where="config/economics_astana.yaml")
 
-    task("8", "Съездить на найденную координату и снять видео",
+    task("10", "Съездить на найденную координату и снять видео",
          detail="Кадр «вот спутниковый снимок, а вот я стою на этой точке» — самый сильный слайд "
-                "презентации. Три часа времени.")
+                "презентации. Три часа времени и цена такси.")
 
-    state["y"] -= 4 * mm
-    pdf.setStrokeColor(Color(*RULE))
-    pdf.setLineWidth(1)
-    pdf.line(margin, state["y"], right, state["y"])
-    state["y"] -= 7 * mm
+    # ---------- С чего начать ---------- #
+    heading("С чего начать", "06")
+    para("1.  Открыть сайт по ссылке на первой странице и пройти обучающий тур — "
+         "пять минут, показывает весь функционал.")
+    para("2.  Прочитать docs/ARCHITECTURE.md — карта системы за десять минут.")
+    para("3.  Открыть docs/TODO.md, выбрать задачу и отметить её галочкой прямо в файле, "
+         "чтобы было видно, кто что взял.")
+    para("4.  Установка: python -m venv .venv, затем pip install -e \".[dev,ml,service]\". "
+         "Подробности и особенности Windows — в README.")
 
-    pdf.setFillColor(Color(*INK))
-    pdf.setFont(bold, 11)
-    pdf.drawString(margin, state["y"], "С чего начать")
-    state["y"] -= 6 * mm
-    text("1.  Открыть сайт по ссылке выше и пройти обучающий тур — пять минут, показывает всё.")
-    text("2.  Прочитать docs/ARCHITECTURE.md — карта системы за десять минут.")
-    text("3.  Открыть docs/TODO.md и взять задачу, отметив её галочкой прямо в файле.")
-    text("4.  Установка: pip install -e \".[dev,ml,service]\" — подробности в README.")
-
-    footer(2)
+    footer()
     pdf.showPage()
     pdf.save()
     return out
