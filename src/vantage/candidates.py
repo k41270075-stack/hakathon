@@ -170,7 +170,6 @@ def build_candidates(
         return gpd.GeoDataFrame({"geometry": []}, geometry="geometry", crs=grid.crs)
 
     labels, n_labels = ndimage.label(mask)
-    label_ids = np.arange(1, n_labels + 1)
     log.info("Связных областей после чистки: %d", n_labels)
 
     gdf = polygonize(mask, grid, simplify_tolerance_m=settings.candidates.simplify_tolerance_m)
@@ -213,7 +212,7 @@ def build_candidates(
         median_index = _aggregate(break_index, labels, present, np.median)
         date_array = np.asarray(dates, dtype="datetime64[D]")
         gdf["break_date"] = [
-            date_array[int(round(idx))] if np.isfinite(idx) else np.datetime64("NaT")
+            date_array[round(idx)] if np.isfinite(idx) else np.datetime64("NaT")
             for idx in median_index
         ]
 
