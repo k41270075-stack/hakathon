@@ -167,7 +167,11 @@ export default function MapApp() {
   }, [candidates]);
 
   return (
-    <div className="flex h-screen flex-col">
+    /* h-screen только на широком экране. На телефоне три колонки
+       складываются в одну, и жёсткая высота окна делила её между списком,
+       картой и карточкой — списку доставалось полторы строки. Там страница
+       должна прокручиваться, а не втискиваться. */
+    <div className="flex min-h-screen flex-col lg:h-screen">
       <Nav current="map">
         <dl className="flex min-w-0 flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
           <div className="flex items-baseline gap-2">
@@ -187,7 +191,7 @@ export default function MapApp() {
 
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[22rem_1fr_23rem]">
         {/* ── Реестр: таблица решения, а не список ────────────────────── */}
-        <aside className="flex min-h-0 flex-col border-r border-grid">
+        <aside className="flex max-h-[60vh] min-h-0 flex-col border-r border-grid lg:max-h-none">
           <div className="flex shrink-0 items-center gap-2 border-b border-grid px-4 py-2.5">
             <label htmlFor="sort" className="text-xs text-muted-2">Сортировка</label>
             <select
@@ -267,7 +271,7 @@ export default function MapApp() {
         </aside>
 
         {/* ── Карта ───────────────────────────────────────────────────── */}
-        <div className="relative min-h-[22rem]">
+        <div className="relative h-[65vh] min-h-[22rem] lg:h-auto">
           <MapView
             candidates={candidates}
             registry={registry}
@@ -292,7 +296,10 @@ export default function MapApp() {
               </label>
             </div>
             {showRisk && (
-              <p className="pointer-events-none max-w-[15rem] text-xs leading-snug text-muted-2">
+              /* Подложка обязательна. Раньше подсказка лежала прямо на
+                 сетке и читалась; на снимке серый текст поверх пёстрого
+                 поля не читается вовсе. */
+              <p className="pointer-events-none max-w-[15rem] rounded-sm border border-grid bg-soot/90 px-2.5 py-1.5 text-xs leading-snug text-muted backdrop-blur-sm">
                 Тепло — вероятность появления новой свалки, а не найденный
                 объект. Границ у зоны нет: риск не обрывается на меже.
               </p>
