@@ -30,7 +30,8 @@
 горизонтального переполнения нет, ошибок в консоли нет.
 
 **Сборка готова к Vercel.** `npm ci && npm run build` из чистого состояния
-проходит; `vercel.json` и workflow Pages настроены на `web-next/dist`.
+проходит; `vercel.json` настроен на `web-next/dist`. Pages выключен —
+см. [deploy/README.md](../deploy/README.md).
 Проверка на утечку закрытых слоёв осталась падающей.
 
 582 теста.
