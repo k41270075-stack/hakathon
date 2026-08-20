@@ -3,11 +3,11 @@ name: Тесты
 # Зелёный значок на главной странице репозитория — это то, что жюри
 # видит до того, как откроет хоть один файл кода.
 #
-# Тесты запускаются по файлам, а не одной командой. Причина конкретная:
-# логи прогонов закрыты для тех, у кого нет доступа к репозиторию, а имена
-# и статусы шагов видны всем. Пока workflow падал одной строкой «Тесты»,
-# понять, что именно сломалось, было нельзя — и он был красным с первого
-# дня, никем не разобранный.
+# Тесты запускаются по файлам, а не одной командой, и падение пишется в
+# имя артефакта. Причина конкретная: логи прогонов закрыты для тех, у кого
+# нет доступа к репозиторию, а имена шагов и артефактов видны всем. Пока
+# workflow падал одной строкой «Тесты», понять, что именно сломалось, было
+# нельзя — и он был красным с первого дня, никем не разобранный.
 
 on:
   push:
@@ -31,89 +31,108 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev,ml,service]"
 
-      - name: Версии окружения
+      - name: Версии геостека
         run: |
           python -V
-          pip list | head -40
+          python -c "import geopandas, shapely, pyproj, rasterio, numpy;             print('geopandas', geopandas.__version__);             print('shapely', shapely.__version__);             print('pyproj', pyproj.__version__, 'PROJ', pyproj.proj_version_str);             print('rasterio', rasterio.__version__, 'GDAL', rasterio.__gdal_version__);             print('numpy', numpy.__version__)"
 
       - name: Линтер
         run: ruff check src tests
 
       - name: "тест test_act.py"
         if: always()
-        run: pytest tests/test_act.py -q
+        run: pytest tests/test_act.py -q --tb=no -rf
       - name: "тест test_aoi.py"
         if: always()
-        run: pytest tests/test_aoi.py -q
+        run: pytest tests/test_aoi.py -q --tb=no -rf
       - name: "тест test_api.py"
         if: always()
-        run: pytest tests/test_api.py -q
+        run: pytest tests/test_api.py -q --tb=no -rf
       - name: "тест test_bot.py"
         if: always()
-        run: pytest tests/test_bot.py -q
+        run: pytest tests/test_bot.py -q --tb=no -rf
       - name: "тест test_candidates.py"
         if: always()
-        run: pytest tests/test_candidates.py -q
+        run: pytest tests/test_candidates.py -q --tb=no -rf
       - name: "тест test_change.py"
         if: always()
-        run: pytest tests/test_change.py -q
+        run: pytest tests/test_change.py -q --tb=no -rf
       - name: "тест test_chips.py"
         if: always()
-        run: pytest tests/test_chips.py -q
+        run: pytest tests/test_chips.py -q --tb=no -rf
       - name: "тест test_config.py"
         if: always()
-        run: pytest tests/test_config.py -q
+        run: pytest tests/test_config.py -q --tb=no -rf
       - name: "тест test_context.py"
         if: always()
-        run: pytest tests/test_context.py -q
+        run: pytest tests/test_context.py -q --tb=no -rf
       - name: "тест test_env.py"
         if: always()
-        run: pytest tests/test_env.py -q
+        run: pytest tests/test_env.py -q --tb=no -rf
       - name: "тест test_explain.py"
         if: always()
-        run: pytest tests/test_explain.py -q
+        run: pytest tests/test_explain.py -q --tb=no -rf
       - name: "тест test_indices.py"
         if: always()
-        run: pytest tests/test_indices.py -q
+        run: pytest tests/test_indices.py -q --tb=no -rf
       - name: "тест test_labels.py"
         if: always()
-        run: pytest tests/test_labels.py -q
+        run: pytest tests/test_labels.py -q --tb=no -rf
       - name: "тест test_model.py"
         if: always()
-        run: pytest tests/test_model.py -q
+        run: pytest tests/test_model.py -q --tb=no -rf
       - name: "тест test_money.py"
         if: always()
-        run: pytest tests/test_money.py -q
+        run: pytest tests/test_money.py -q --tb=no -rf
       - name: "тест test_observability.py"
         if: always()
-        run: pytest tests/test_observability.py -q
+        run: pytest tests/test_observability.py -q --tb=no -rf
       - name: "тест test_pipeline.py"
         if: always()
-        run: pytest tests/test_pipeline.py -q
+        run: pytest tests/test_pipeline.py -q --tb=no -rf
       - name: "тест test_posthistory.py"
         if: always()
-        run: pytest tests/test_posthistory.py -q
+        run: pytest tests/test_posthistory.py -q --tb=no -rf
       - name: "тест test_removal.py"
         if: always()
-        run: pytest tests/test_removal.py -q
+        run: pytest tests/test_removal.py -q --tb=no -rf
       - name: "тест test_risk.py"
         if: always()
-        run: pytest tests/test_risk.py -q
+        run: pytest tests/test_risk.py -q --tb=no -rf
       - name: "тест test_signal_attach.py"
         if: always()
-        run: pytest tests/test_signal_attach.py -q
+        run: pytest tests/test_signal_attach.py -q --tb=no -rf
       - name: "тест test_signals.py"
         if: always()
-        run: pytest tests/test_signals.py -q
+        run: pytest tests/test_signals.py -q --tb=no -rf
       - name: "тест test_tiling.py"
         if: always()
-        run: pytest tests/test_tiling.py -q
+        run: pytest tests/test_tiling.py -q --tb=no -rf
       - name: "тест test_verify.py"
         if: always()
-        run: pytest tests/test_verify.py -q
+        run: pytest tests/test_verify.py -q --tb=no -rf
       - name: "тест test_vlm.py"
         if: always()
-        run: pytest tests/test_vlm.py -q
+        run: pytest tests/test_vlm.py -q --tb=no -rf
+
+      # Имена упавших тестов уезжают в имя артефакта: это единственный
+      # публично читаемый канал, когда логи закрыты.
+      - name: Собрать список упавших
+        if: failure()
+        id: failures
+        run: |
+          pytest -q --tb=no -rf > result.txt 2>&1 || true
+          names=$(grep '^FAILED' result.txt | sed 's|FAILED tests/||; s|::|-|g; s|\.py||' | head -12 | tr '
+' '.' )
+          echo "list=${names:-неизвестно}" >> "$GITHUB_OUTPUT"
+
+      - name: Опубликовать имена упавших
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: "УПАЛИ.${{ steps.failures.outputs.list }}"
+          path: result.txt
+          if-no-files-found: ignore
 
       - name: Проверка готовности к сдаче
         if: always()
