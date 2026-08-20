@@ -3,11 +3,11 @@ name: Тесты
 # Зелёный значок на главной странице репозитория — это то, что жюри
 # видит до того, как откроет хоть один файл кода.
 #
-# Тесты запускаются по файлам, а не одной командой, и падение пишется в
-# имя артефакта. Причина конкретная: логи прогонов закрыты для тех, у кого
-# нет доступа к репозиторию, а имена шагов и артефактов видны всем. Пока
-# workflow падал одной строкой «Тесты», понять, что именно сломалось, было
-# нельзя — и он был красным с первого дня, никем не разобранный.
+# Тесты запускаются по файлам, а не одной командой, и имена упавших
+# уезжают в имя артефакта. Причина конкретная: логи прогонов закрыты для
+# тех, у кого нет доступа к репозиторию, а имена шагов и артефактов видны
+# всем. Пока workflow падал одной строкой «Тесты», понять, что именно
+# сломалось, было нельзя — и он был красным с первого дня.
 
 on:
   push:
@@ -32,9 +32,7 @@ jobs:
           pip install -e ".[dev,ml,service]"
 
       - name: Версии геостека
-        run: |
-          python -V
-          python -c "import geopandas, shapely, pyproj, rasterio, numpy;             print('geopandas', geopandas.__version__);             print('shapely', shapely.__version__);             print('pyproj', pyproj.__version__, 'PROJ', pyproj.proj_version_str);             print('rasterio', rasterio.__version__, 'GDAL', rasterio.__gdal_version__);             print('numpy', numpy.__version__)"
+        run: python scripts/print_versions.py
 
       - name: Линтер
         run: ruff check src tests
@@ -114,23 +112,22 @@ jobs:
       - name: "тест test_vlm.py"
         if: always()
         run: pytest tests/test_vlm.py -q --tb=no -rf
-
       # Имена упавших тестов уезжают в имя артефакта: это единственный
-      # публично читаемый канал, когда логи закрыты.
+      # публично читаемый канал, когда логи закрыты. Список собирает
+      # отдельный скрипт — шелл-однострочник с кавычками и переводами
+      # строк внутри YAML уже один раз сломал разбор файла целиком.
       - name: Собрать список упавших
         if: failure()
         id: failures
         run: |
           pytest -q --tb=no -rf > result.txt 2>&1 || true
-          names=$(grep '^FAILED' result.txt | sed 's|FAILED tests/||; s|::|-|g; s|\.py||' | head -12 | tr '
-' '.' )
-          echo "list=${names:-неизвестно}" >> "$GITHUB_OUTPUT"
+          python scripts/failed_names.py result.txt >> "$GITHUB_OUTPUT"
 
       - name: Опубликовать имена упавших
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: "УПАЛИ.${{ steps.failures.outputs.list }}"
+          name: "UPALI-${{ steps.failures.outputs.list }}"
           path: result.txt
           if-no-files-found: ignore
 
