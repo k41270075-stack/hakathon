@@ -14,32 +14,32 @@ import subprocess
 import sys
 
 result = subprocess.run(
-    [sys.executable, "-m", "pytest", *sys.argv[1:], "-q", "--tb=line", "--no-header"],
+    [sys.executable, "-m", "pytest", *sys.argv[1:], "-q", "-rf", "--tb=line", "--no-header"],
     capture_output=True,
     text=True,
     encoding="utf-8",
     errors="replace",
+    check=False,
 )
 output = result.stdout + result.stderr
 print(output)
 
-# --tb=line даёт по строке на падение: "путь:строка: текст ошибки".
-reasons = re.findall(r"^/.*?:\d+: (.+)$", output, flags=re.M)
-reasons += re.findall(r"^[A-Za-z]:.*?:\d+: (.+)$", output, flags=re.M)
+# --tb=line даёт по строке на падение: «путь:строка: текст ошибки».
+reasons = re.findall(r"^\S*?:\d+: (.+)$", output, flags=re.M)
 failed = re.findall(r"^FAILED (\S+)(?: - (.*))?$", output, flags=re.M)
 
-seen = set()
+seen: set[str] = set()
 for name, message in failed:
     short = name.replace("tests/", "")
     text = (message or "").strip()
     if not text and reasons:
         text = reasons.pop(0)
-    line = f"{short} :: {text}"[:400]
+    # Переводы строк в аннотации недопустимы: GitHub обрежет сообщение
+    # по первому же из них, и причина потеряется.
+    line = f"{short} :: {text}"[:400].replace("\n", " ").replace("\r", " ")
     if line in seen:
         continue
     seen.add(line)
-    # Переводы строк в аннотации недопустимы — GitHub обрежет сообщение.
-    print("::error title=" + short + "::" + line.replace("
-", " "))
+    print("::error title=" + short + "::" + line)
 
 sys.exit(result.returncode)
