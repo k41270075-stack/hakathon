@@ -2,13 +2,6 @@ name: Тесты
 
 # Зелёный значок на главной странице репозитория — это то, что жюри
 # видит до того, как откроет хоть один файл кода.
-#
-# Разбивка по классам — не стиль, а вынужденная мера. Логи прогонов
-# закрыты для тех, у кого нет доступа к репозиторию, а имена шагов видны
-# всем. Три геометрических файла падают только здесь, на Linux с другой
-# версией PROJ и GEOS; локально и в чистом окружении проходят все.
-# Пока падение выглядело одной строкой «Тесты», чинить было нечего —
-# workflow был красным с первого дня и ни разу не разобран.
 
 on:
   push:
@@ -20,7 +13,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: actions/setup-python@v5
         with:
@@ -32,78 +25,21 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev,ml,service]"
 
-      - name: Версии геостека
+      # Версии геостека печатаются всегда. Тесты геометрии проходили
+      # локально и падали здесь; разница оказалась в pandas, а не в коде,
+      # и без этой строки её пришлось искать пятью прогонами.
+      - name: Версии окружения
         run: python scripts/print_versions.py
 
       - name: Линтер
         run: ruff check src tests
 
-      - name: "остальные файлы"
-        if: always()
-        run: pytest tests/test_act.py tests/test_aoi.py tests/test_api.py tests/test_bot.py tests/test_change.py tests/test_chips.py tests/test_config.py tests/test_env.py tests/test_explain.py tests/test_indices.py tests/test_labels.py tests/test_model.py tests/test_money.py tests/test_observability.py tests/test_posthistory.py tests/test_removal.py tests/test_risk.py tests/test_signal_attach.py tests/test_signals.py tests/test_tiling.py tests/test_verify.py tests/test_vlm.py -q --tb=no
-      - name: "candidates: TestRasterGrid"
-        if: always()
-        run: pytest "tests/test_candidates.py::TestRasterGrid" -q --tb=line
-      - name: "candidates: TestCleanMask"
-        if: always()
-        run: pytest "tests/test_candidates.py::TestCleanMask" -q --tb=line
-      - name: "candidates: TestPolygonize"
-        if: always()
-        run: pytest "tests/test_candidates.py::TestPolygonize" -q --tb=line
-      - name: "candidates: TestBuildCandidates"
-        if: always()
-        run: pytest "tests/test_candidates.py::TestBuildCandidates" -q --tb=line
-      - name: "candidates: TestExport"
-        if: always()
-        run: pytest "tests/test_candidates.py::TestExport" -q --tb=line
-      - name: "context: TestQueryBuilding"
-        if: always()
-        run: pytest "tests/test_context.py::TestQueryBuilding" -q --tb=line
-      - name: "context: TestOverpassParsing"
-        if: always()
-        run: pytest "tests/test_context.py::TestOverpassParsing" -q --tb=line
-      - name: "context: TestDistances"
-        if: always()
-        run: pytest "tests/test_context.py::TestDistances" -q --tb=line
-      - name: "context: TestContextFilter"
-        if: always()
-        run: pytest "tests/test_context.py::TestContextFilter" -q --tb=line
-      - name: "context: TestRejectionReport"
-        if: always()
-        run: pytest "tests/test_context.py::TestRejectionReport" -q --tb=line
-      - name: "pipeline: TestGeoJsonExport"
-        if: always()
-        run: pytest "tests/test_pipeline.py::TestGeoJsonExport" -q --tb=line
-      - name: "pipeline: TestDissolvePublic"
-        if: always()
-        run: pytest "tests/test_pipeline.py::TestDissolvePublic" -q --tb=line
-      - name: "pipeline: TestDemoData"
-        if: always()
-        run: pytest "tests/test_pipeline.py::TestDemoData" -q --tb=line
-      - name: "pipeline: TestStory"
-        if: always()
-        run: pytest "tests/test_pipeline.py::TestStory" -q --tb=line
-      - name: "pipeline: TestGenerateAll"
-        if: always()
-        run: pytest "tests/test_pipeline.py::TestGenerateAll" -q --tb=line
-      - name: "pipeline: TestPipeline"
-        if: always()
-        run: pytest "tests/test_pipeline.py::TestPipeline" -q --tb=line
-      - name: "pipeline: TestCutoffDate"
-        if: always()
-        run: pytest "tests/test_pipeline.py::TestCutoffDate" -q --tb=line
-      - name: "pipeline: TestTimed"
-        if: always()
-        run: pytest "tests/test_pipeline.py::TestTimed" -q --tb=line
-      - name: "pipeline: TestRunReport"
-        if: always()
-        run: pytest "tests/test_pipeline.py::TestRunReport" -q --tb=line
-      - name: "pipeline: TestRiskConfigGuard"
-        if: always()
-        run: pytest "tests/test_pipeline.py::TestRiskConfigGuard" -q --tb=line
-      # Причины падений уезжают в аннотации: логи закрыты, аннотации нет.
-      - name: Причины падений
-        if: always()
+      # Через ci_report, а не голым pytest: он превращает падения в
+      # аннотации GitHub. Логи прогонов закрыты для тех, у кого нет
+      # доступа к репозиторию, а аннотации публичны — это единственный
+      # канал, по которому текст упавшего assert доезжает до того, кто
+      # чинит. Разбирать красный workflow вслепую стоило полдня.
+      - name: Тесты
         run: python scripts/ci_report.py tests
 
       - name: Проверка готовности к сдаче
