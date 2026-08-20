@@ -101,6 +101,11 @@ jobs:
       - name: "pipeline: TestRiskConfigGuard"
         if: always()
         run: pytest "tests/test_pipeline.py::TestRiskConfigGuard" -q --tb=line
+      # Причины падений уезжают в аннотации: логи закрыты, аннотации нет.
+      - name: Причины падений
+        if: always()
+        run: python scripts/ci_report.py tests
+
       - name: Проверка готовности к сдаче
         if: always()
         run: vantage doctor
