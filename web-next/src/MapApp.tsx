@@ -17,6 +17,21 @@ import { Nav } from './components/Nav';
 type Props = Record<string, unknown>;
 type Feature = GeoJSON.Feature<GeoJSON.Geometry, Props>;
 
+/* Контроль устранения. Три статуса, и третий — главный.
+ *
+ * «Возможно засыпан» означает: растительность вернулась, открытый грунт
+ * нормализовался, объект формально выглядит убранным — а тепловая аномалия
+ * держится, то есть органика под насыпью продолжает разлагаться. По такому
+ * объекту может быть закрыт акт и оплачена работа, при том что отходы на
+ * месте. Поэтому он и красный, и в списке выезда стоит первым.
+ */
+const REMOVAL: Record<string, { label: string; tone: string; dot: string }> = {
+  active: { label: 'активна', tone: 'text-muted', dot: '#a78bfa' },
+  possibly_removed: { label: 'вероятно устранена', tone: 'text-muted-2', dot: '#4c1d95' },
+  possibly_covered: { label: 'возможно засыпана', tone: 'text-line', dot: '#ede9fe' },
+  insufficient_data: { label: 'данных мало', tone: 'text-muted-2', dot: '#2f2450' },
+};
+
 const SIGNALS: [string, string, number][] = [
   ['ndvi_drop', 'Падение вегетации', 0.35],
   ['bsi_rise', 'Открытый грунт', 0.25],
@@ -24,6 +39,11 @@ const SIGNALS: [string, string, number][] = [
   ['sar_incoherence', 'Нестабильность (радар)', 3.0],
   ['thermal_anomaly', 'Тепловая аномалия', 3.0],
 ];
+
+const removalOf = (p: Props) => {
+  const status = typeof p.removal_status === 'string' ? p.removal_status : '';
+  return REMOVAL[status] ?? null;
+};
 
 const kzt = (v: unknown) => {
   const n = Number(v);
@@ -46,9 +66,10 @@ function humanDate(v: unknown) {
   return Number.isNaN(d.getTime()) ? '—' : `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-type SortKey = 'evidence_score' | 'damage_p50' | 'area_m2' | 'break_date';
+type SortKey = 'evidence_score' | 'damage_p50' | 'area_m2' | 'break_date' | 'risk_of_cover';
 
 const SORTS: [SortKey, string][] = [
+  ['risk_of_cover', 'сначала подозрение на присыпку'],
   ['evidence_score', 'по согласию признаков'],
   ['damage_p50', 'по ущербу'],
   ['area_m2', 'по площади'],
@@ -60,7 +81,7 @@ export default function MapApp() {
   const [registry, setRegistry] = useState<GeoJSON.FeatureCollection | null>(null);
   const [risk, setRisk] = useState<GeoJSON.FeatureCollection | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const [sort, setSort] = useState<SortKey>('evidence_score');
+  const [sort, setSort] = useState<SortKey>('risk_of_cover');
   const [basemap, setBasemap] = useState<Basemap>('grid');
   // Прогноз выключен по умолчанию. Он покрывает всю область сплошной
   // заливкой и на старте прячет то, ради чего карту открыли, — сами
@@ -80,6 +101,15 @@ export default function MapApp() {
   const rows = useMemo(() => {
     const list = [...(candidates?.features ?? [])] as Feature[];
     list.sort((a, b) => {
+      if (sort === 'risk_of_cover') {
+        // Подозрение на присыпку выше всего: по такому объекту может быть
+        // закрыт акт, а отходы на месте. Внутри группы — по ущербу.
+        const weight = (f: Feature) =>
+          f.properties.removal_status === 'possibly_covered' ? 2
+          : f.properties.removal_status === 'active' ? 1 : 0;
+        const diff = weight(b) - weight(a);
+        return diff || (Number(b.properties.damage_p50) || 0) - (Number(a.properties.damage_p50) || 0);
+      }
       if (sort === 'break_date') {
         return String(b.properties.break_date ?? '').localeCompare(String(a.properties.break_date ?? ''));
       }
@@ -157,6 +187,16 @@ export default function MapApp() {
                       <span className="tabular">{num(p.area_m2)} м²</span>
                       <span className="tabular">{kzt(p.damage_p50)}</span>
                       <span>{humanDate(p.break_date)}</span>
+                      {removalOf(p) && (
+                        <span className="flex items-center gap-1.5">
+                          <span
+                            aria-hidden="true"
+                            className="inline-block h-2 w-2 rounded-full"
+                            style={{ background: removalOf(p)!.dot }}
+                          />
+                          {removalOf(p)!.label}
+                        </span>
+                      )}
                     </div>
                     <div className="mt-2 h-[3px] w-full bg-grid">
                       <div className="h-full bg-violet-lit" style={{ width: `${Math.min(100, score * 100)}%` }} />
@@ -307,6 +347,23 @@ function ObjectCard({ f }: { f: Feature }) {
       <p className="tabular mt-1 text-xs text-muted-2">
         P10 {kzt(p.damage_p10)} · P90 {kzt(p.damage_p90)}
       </p>
+
+      {removalOf(p) && (
+        <>
+          <h3 className="mt-6 text-sm text-muted-2">Контроль устранения</h3>
+          <p className="mt-1 flex items-center gap-2 text-line">
+            <span
+              aria-hidden="true"
+              className="inline-block h-2.5 w-2.5 rounded-full"
+              style={{ background: removalOf(p)!.dot }}
+            />
+            {removalOf(p)!.label}
+          </p>
+          {typeof p.removal_note === 'string' && p.removal_note && (
+            <p className="mt-1.5 text-xs leading-snug text-muted-2">{p.removal_note}</p>
+          )}
+        </>
+      )}
 
       <h3 className="mt-6 text-sm text-muted-2">Норма</h3>
       <p className="mt-1 text-sm text-line">{String(p.penalty_article ?? 'ст. 344, ч. 2-1 КоАП РК')}</p>
