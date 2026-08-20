@@ -2,6 +2,12 @@ name: Тесты
 
 # Зелёный значок на главной странице репозитория — это то, что жюри
 # видит до того, как откроет хоть один файл кода.
+#
+# Тесты запускаются по файлам, а не одной командой. Причина конкретная:
+# логи прогонов закрыты для тех, у кого нет доступа к репозиторию, а имена
+# и статусы шагов видны всем. Пока workflow падал одной строкой «Тесты»,
+# понять, что именно сломалось, было нельзя — и он был красным с первого
+# дня, никем не разобранный.
 
 on:
   push:
@@ -25,11 +31,90 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev,ml,service]"
 
+      - name: Версии окружения
+        run: |
+          python -V
+          pip list | head -40
+
       - name: Линтер
         run: ruff check src tests
 
-      - name: Тесты
-        run: pytest -q
+      - name: "тест test_act.py"
+        if: always()
+        run: pytest tests/test_act.py -q
+      - name: "тест test_aoi.py"
+        if: always()
+        run: pytest tests/test_aoi.py -q
+      - name: "тест test_api.py"
+        if: always()
+        run: pytest tests/test_api.py -q
+      - name: "тест test_bot.py"
+        if: always()
+        run: pytest tests/test_bot.py -q
+      - name: "тест test_candidates.py"
+        if: always()
+        run: pytest tests/test_candidates.py -q
+      - name: "тест test_change.py"
+        if: always()
+        run: pytest tests/test_change.py -q
+      - name: "тест test_chips.py"
+        if: always()
+        run: pytest tests/test_chips.py -q
+      - name: "тест test_config.py"
+        if: always()
+        run: pytest tests/test_config.py -q
+      - name: "тест test_context.py"
+        if: always()
+        run: pytest tests/test_context.py -q
+      - name: "тест test_env.py"
+        if: always()
+        run: pytest tests/test_env.py -q
+      - name: "тест test_explain.py"
+        if: always()
+        run: pytest tests/test_explain.py -q
+      - name: "тест test_indices.py"
+        if: always()
+        run: pytest tests/test_indices.py -q
+      - name: "тест test_labels.py"
+        if: always()
+        run: pytest tests/test_labels.py -q
+      - name: "тест test_model.py"
+        if: always()
+        run: pytest tests/test_model.py -q
+      - name: "тест test_money.py"
+        if: always()
+        run: pytest tests/test_money.py -q
+      - name: "тест test_observability.py"
+        if: always()
+        run: pytest tests/test_observability.py -q
+      - name: "тест test_pipeline.py"
+        if: always()
+        run: pytest tests/test_pipeline.py -q
+      - name: "тест test_posthistory.py"
+        if: always()
+        run: pytest tests/test_posthistory.py -q
+      - name: "тест test_removal.py"
+        if: always()
+        run: pytest tests/test_removal.py -q
+      - name: "тест test_risk.py"
+        if: always()
+        run: pytest tests/test_risk.py -q
+      - name: "тест test_signal_attach.py"
+        if: always()
+        run: pytest tests/test_signal_attach.py -q
+      - name: "тест test_signals.py"
+        if: always()
+        run: pytest tests/test_signals.py -q
+      - name: "тест test_tiling.py"
+        if: always()
+        run: pytest tests/test_tiling.py -q
+      - name: "тест test_verify.py"
+        if: always()
+        run: pytest tests/test_verify.py -q
+      - name: "тест test_vlm.py"
+        if: always()
+        run: pytest tests/test_vlm.py -q
 
       - name: Проверка готовности к сдаче
+        if: always()
         run: vantage doctor
