@@ -1,4 +1,4 @@
-/* Знак VANTAGE.
+/* Знак Vantage.
  *
  * Знак выведен из механизма, а не из темы: это запись прибора, которая идёт
  * ровно, срывается вниз и **не возвращается**. Необратимость — единственный
@@ -115,8 +115,12 @@ export function Logo({ size = 30, className = '' }: Props) {
     <span className={`inline-flex items-center gap-2.5 ${className}`}>
       <Mark size={size} />
       <span
-        className="font-display font-semibold uppercase leading-none text-line"
-        style={{ fontSize: size * 0.72, letterSpacing: '0.16em' }}
+        /* Без uppercase и почти без разрядки. Капслок с межбуквенным
+           интервалом читается как аббревиатура — VANTAGE выглядело
+           набором букв, а не словом, и в глаза не бросалось именно
+           поэтому: у слова, набранного капителью, нет силуэта. */
+        className="font-display font-semibold leading-none text-line"
+        style={{ fontSize: size * 0.82, letterSpacing: '0.01em' }}
       >
         Vantage
       </span>
