@@ -78,16 +78,15 @@ export const HeatLayer = L.GridLayer.extend({
   },
 
   createTile(this: HeatSelf, coords: L.Coords) {
-    const self = this;
-    const size = self.getTileSize();
+    const size = this.getTileSize();
     const tile = L.DomUtil.create('canvas', 'leaflet-tile') as HTMLCanvasElement;
     tile.width = size.x;
     tile.height = size.y;
     const ctx = tile.getContext('2d');
     if (!ctx) return tile;
 
-    const limit = self.options.year ?? null;
-    const points = (self.options.points ?? []).filter(
+    const limit = this.options.year ?? null;
+    const points = (this.options.points ?? []).filter(
       (p) => limit == null || (p.year != null && p.year <= limit),
     );
     if (!points.length) return tile;
@@ -97,7 +96,7 @@ export const HeatLayer = L.GridLayer.extend({
 
     ctx.globalCompositeOperation = 'lighter';
     for (const point of points) {
-      const projected = self._map.project(L.latLng(point.lat, point.lon), coords.z);
+      const projected = this._map.project(L.latLng(point.lat, point.lon), coords.z);
       const x = projected.x - origin.x;
       const y = projected.y - origin.y;
       if (x < -radius || y < -radius || x > size.x + radius || y > size.y + radius) continue;
