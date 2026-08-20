@@ -11,8 +11,10 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { MapView, type Basemap } from './components/MapView';
 import { Nav } from './components/Nav';
+import { Act } from './components/Act';
 
 type Props = Record<string, unknown>;
 type Feature = GeoJSON.Feature<GeoJSON.Geometry, Props>;
@@ -39,6 +41,25 @@ const SIGNALS: [string, string, number][] = [
   ['sar_incoherence', 'Нестабильность (радар)', 3.0],
   ['thermal_anomaly', 'Тепловая аномалия', 3.0],
 ];
+
+/** Центр объекта по его геометрии: в акт идут координаты, а не «где-то там». */
+function centerOf(f: Feature): [number, number] | null {
+  const coords: number[][] =
+    f.geometry.type === 'Polygon'
+      ? (f.geometry.coordinates[0] as number[][])
+      : f.geometry.type === 'MultiPolygon'
+        ? (f.geometry.coordinates[0][0] as number[][])
+        : [];
+  if (!coords.length) return null;
+  let minLon = 180, minLat = 90, maxLon = -180, maxLat = -90;
+  for (const [lon, lat] of coords) {
+    if (lon < minLon) minLon = lon;
+    if (lon > maxLon) maxLon = lon;
+    if (lat < minLat) minLat = lat;
+    if (lat > maxLat) maxLat = lat;
+  }
+  return [(minLat + maxLat) / 2, (minLon + maxLon) / 2];
+}
 
 const removalOf = (p: Props) => {
   const status = typeof p.removal_status === 'string' ? p.removal_status : '';
@@ -376,6 +397,17 @@ function ObjectCard({ f }: { f: Feature }) {
       >
         Черновик акта
       </button>
+
+      {/* Бланк выносится порталом прямо в body, а не остаётся в дереве.
+          Правило печати прячет всех прямых детей body кроме него; вложенный
+          в разметку карты, он прятался бы вместе с родителем — печать
+          выходила пустой страницей, и это показал первый же тестовый PDF. */}
+      {createPortal(
+        <div id="act-root">
+          <Act p={p} center={centerOf(f)} />
+        </div>,
+        document.body,
+      )}
       <p className="mt-2 text-xs leading-snug text-muted-2">
         Документ выходит черновиком и становится актом только после
         подтверждения именем и должностью.
