@@ -150,15 +150,24 @@ export default function App() {
                 свалки из космоса · дата, площадь, сумма
               </p>
 
-              <h1 className="max-w-[15ch] text-[clamp(2.3rem,5.5vw,4rem)] leading-[1.02] text-line">
-                {hero && whenPhrase(hero.properties?.break_date)
-                  ? `Свалка возникла ${whenPhrase(hero.properties?.break_date)}`
-                  : 'Свалка возникла, и её нет ни в одном реестре'}
+              {/* Заголовок говорит, что это за продукт, а не рассказывает
+                  историю одного объекта.
+
+                  Раньше здесь стояло «Свалка возникла в апреле 2019».
+                  Фраза красивая и совершенно непонятная человеку, который
+                  видит страницу впервые: он не знает ни что за свалка, ни
+                  чей это сайт, ни что ему предлагают. История объекта —
+                  хорошее второе предложение и плохое первое. */}
+              <h1 className="max-w-[17ch] text-[clamp(2.1rem,5vw,3.5rem)] leading-[1.04] text-line">
+                Находим стихийные свалки на спутниковых снимках
               </h1>
-              <p className="mt-5 max-w-[46ch] text-lg leading-relaxed text-muted">
-                Её нет ни в одном открытом реестре. Спутник видел, как это
-                произошло, — снимки восьми лет лежали в архиве и ждали, пока
-                их прочитают.
+              <p className="mt-5 max-w-[48ch] text-lg leading-relaxed text-muted">
+                Программа читает восемь лет архива и ищет места, где
+                растительность исчезла и <strong className="font-normal text-line">не вернулась</strong>.
+                По каждому называет дату появления, площадь и сумму ущерба в
+                тенге{hero && whenPhrase(hero.properties?.break_date)
+                  ? `. Самая крупная из найденных возникла ${whenPhrase(hero.properties?.break_date)} — и её нет ни в одном открытом реестре.`
+                  : '.'}
               </p>
 
               <dl className="mt-8 grid grid-cols-3 gap-4 border-t border-grid pt-6">

@@ -39,7 +39,7 @@ const MIN_PX = 8;
 const MAX_PX = 320;
 
 /** Запас холста за краями экрана, чтобы при перетаскивании не было пустоты. */
-const PAD = 0.12;
+const PAD = 0.08;
 
 /* Холст рисуется вдвое мельче экрана и растягивается стилями.
  *
@@ -114,12 +114,10 @@ export class HeatOverlay extends L.Layer {
   private spriteRadius = -1;
   private frame = 0;
 
-  /* Состояние на момент последней отрисовки. Без него холст невозможно
-     удержать на месте во время зума: смещение считается ОТ того вида, в
-     котором пиксели были нарисованы, а не от текущего. */
+  /* Левый верхний угол холста в координатах слоя — начало отсчёта при
+     рисовании. Панорамирование Leaflet двигает сам, поэтому пересчитывать
+     его нужно только при изменении вида. */
   private origin: L.Point | null = null;
-  private drawnCenter: L.LatLng | null = null;
-  private drawnZoom = 0;
 
   constructor(points: HeatPoint[] = [], options: Options = {}) {
     super();
@@ -140,13 +138,22 @@ export class HeatOverlay extends L.Layer {
     map.getPanes().overlayPane.appendChild(canvas);
 
     map.on('moveend zoomend resize', this.reset, this);
-    // Событие zoom идёт непрерывно и при колесе, и при щипке. Без него
-    // холст оставался на старом месте до конца жеста — это и выглядело
-    // как «тепловая карта отстаёт и уезжает».
-    map.on('zoom', this.onZoom, this);
-    if (map.options.zoomAnimation && L.Browser.any3d) {
-      map.on('zoomanim', this.onZoomAnim, this);
-    }
+
+    /* На время зума холст убирается совсем.
+     *
+     * Раньше он ехал вместе с картой: на каждом кадре жеста браузер
+     * переклеивал растянутое стилями изображение во весь экран. Расчёта в
+     * этом нет никакого — измерение показало главный поток свободным, —
+     * но работа есть, и на слабой видеокарте она видна как рывки.
+     *
+     * Смысла в этой работе тоже нет: во время жеста тепло всё равно
+     * показывает не то, что под ним, — масштаб уже другой, а пиксели
+     * старые. Поэтому холст прячется на зумстарте и возвращается
+     * пересчитанным на зумэнде. Жест становится мгновенным, а тепло —
+     * правильным, вместо «плавно, но и не то, и с рывками».
+     */
+    map.on('zoomstart', this.hide, this);
+    map.on('zoomend', this.show, this);
     this.reset();
     return this;
   }
@@ -154,8 +161,8 @@ export class HeatOverlay extends L.Layer {
   onRemove(map: L.Map): this {
     if (this.frame) { cancelAnimationFrame(this.frame); this.frame = 0; }
     map.off('moveend zoomend resize', this.reset, this);
-    map.off('zoom', this.onZoom, this);
-    map.off('zoomanim', this.onZoomAnim, this);
+    map.off('zoomstart', this.hide, this);
+    map.off('zoomend', this.show, this);
     this.canvas?.remove();
     this.canvas = null;
     this.ctx = null;
@@ -192,40 +199,12 @@ export class HeatOverlay extends L.Layer {
     });
   }
 
-  /* Первая версия считала смещение через _getCenterOffset и уезжала: эта
-     величина отсчитывается от ТЕКУЩЕГО вида карты, а пиксели на холсте
-     нарисованы в предыдущем. При каждом шаге зума пятна прыгали на новое
-     место и возвращались только по окончании жеста.
-  
-     Формула ниже — та же, которой пользуется собственный canvas-рендерер
-     Leaflet: смещение считается от запомненных центра и зума отрисовки.
-     Приватным остаётся один метод вместо двух. */
-  private updateTransform(center: L.LatLng, zoom: number) {
-    const map = this._map;
-    if (!map || !this.canvas || !this.drawnCenter) return;
-
-    const inner = map as unknown as {
-      _getNewPixelOrigin(center: L.LatLng, zoom: number): L.Point;
-    };
-    const scale = map.getZoomScale(zoom, this.drawnZoom);
-    const viewHalf = map.getSize().multiplyBy(0.5 + PAD);
-    const drawnCenterNow = map.project(this.drawnCenter, zoom);
-    const offset = viewHalf
-      .multiplyBy(-scale)
-      .add(drawnCenterNow)
-      .subtract(inner._getNewPixelOrigin(center, zoom));
-
-    L.DomUtil.setTransform(this.canvas, offset, scale);
+  private hide() {
+    if (this.canvas) this.canvas.style.visibility = 'hidden';
   }
 
-  private onZoomAnim(event: L.ZoomAnimEvent) {
-    this.updateTransform(event.center, event.zoom);
-  }
-
-  private onZoom() {
-    const map = this._map;
-    if (!map) return;
-    this.updateTransform(map.getCenter(), map.getZoom());
+  private show() {
+    if (this.canvas) this.canvas.style.visibility = 'visible';
   }
 
   private reset() {
@@ -250,8 +229,6 @@ export class HeatOverlay extends L.Layer {
     // Левый верхний угол холста в координатах слоя. Он же начало отсчёта
     // при рисовании — иначе позиция пятен и позиция холста разъезжаются.
     this.origin = map.containerPointToLayerPoint(size.multiplyBy(-PAD)).round();
-    this.drawnCenter = map.getCenter();
-    this.drawnZoom = map.getZoom();
 
     L.DomUtil.setTransform(canvas, this.origin, 1);
     this.draw();
