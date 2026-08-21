@@ -49,6 +49,7 @@ import json
 import math
 import os
 import re
+import urllib.error
 import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler
@@ -142,6 +143,26 @@ def token() -> str:
     return found.group(0) if found else raw.strip()
 
 
+def webhook_secret() -> str:
+    """Секрет для Telegram, выведенный из заданного.
+
+    Telegram принимает в secret_token только латиницу, цифры, дефис и
+    подчёркивание, длиной до 256 символов. Человек, которому сказали
+    «придумайте длинную случайную строку», вставляет туда пробелы,
+    кириллицу и знаки препинания — и setWebhook отвечает 400 без
+    объяснения, какое именно поле ему не понравилось.
+
+    Поэтому в Telegram уходит не сам секрет, а его отпечаток: он всегда
+    состоит из шестнадцатеричных цифр и всегда одинаковой длины. Тот же
+    отпечаток проверяется на входящих обновлениях, так что сравнение
+    остаётся точным.
+    """
+    raw = os.environ.get("VANTAGE_BOT_SECRET", "")
+    if not raw:
+        return ""
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
 def hide_token(text: str) -> str:
     """Убрать токен из любого текста, который может попасть наружу.
 
@@ -172,7 +193,16 @@ def ask(method: str, payload: dict | None = None) -> dict:
     )
     try:
         return json.loads(urllib.request.urlopen(request, timeout=10).read())
-    except Exception as error:  # текст ошибки и есть ответ, но без ключа
+    except urllib.error.HTTPError as error:
+        # У Telegram причина отказа лежит в ТЕЛЕ ответа, а не в коде.
+        # Без чтения тела диагностика сводится к «400 Bad Request», по
+        # которому нельзя понять ничего.
+        try:
+            body = json.loads(error.read())
+            return {"ok": False, "description": hide_token(str(body.get("description", body)))}
+        except Exception:  # тело не разобралось — отдаём хоть код
+            return {"ok": False, "description": hide_token(str(error))}
+    except Exception as error:
         return {"ok": False, "description": hide_token(str(error))}
 
 
@@ -298,7 +328,7 @@ class handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         # Секрет проверяется до разбора тела: адрес функции публичный, и
         # без проверки любой мог бы прислать поддельное обновление.
-        secret = os.environ.get("VANTAGE_BOT_SECRET")
+        secret = webhook_secret()
         if secret and self.headers.get("X-Telegram-Bot-Api-Secret-Token") != secret:
             self.send_response(403)
             self.end_headers()
@@ -347,8 +377,8 @@ class handler(BaseHTTPRequestHandler):
             host = self.headers.get("X-Forwarded-Host") or self.headers.get("Host") or ""
             url = f"https://{host}/api/telegram"
             payload = {"url": url, "drop_pending_updates": True}
-            if secret:
-                payload["secret_token"] = secret
+            if webhook_secret():
+                payload["secret_token"] = webhook_secret()
             result = ask("setWebhook", payload)
             lines.append(
                 f"Регистрация вебхука на {url}: "
