@@ -357,7 +357,7 @@ class handler(BaseHTTPRequestHandler):
         страница вместо переписки «а что вы вводили».
         """
         query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-        secret = os.environ.get("VANTAGE_BOT_SECRET", "")
+        secret_given = bool(os.environ.get("VANTAGE_BOT_SECRET", ""))
         lines: list[str] = []
 
         # Регистрация вебхука прямо отсюда, и БЕЗ проверки секрета.
@@ -391,11 +391,16 @@ class handler(BaseHTTPRequestHandler):
             "Vantage AI bot",
             f"Объектов в указателе: {len(candidates())}",
             f"Токен задан: {'да' if token() else 'НЕТ'}",
-            f"Секрет задан: {'да' if secret else 'НЕТ'}",
+            f"Секрет задан: {'да' if secret_given else 'НЕТ'}",
             f"Подписчиков: {len(subscribers()) or 'НЕТ'}",
             "",
             f"Вебхук: {info.get('url') or 'НЕ ЗАРЕГИСТРИРОВАН'}",
-            f"Секрет у вебхука: {'да' if info.get('has_custom_certificate') is not None and info.get('url') else '—'}",
+            # Задан ли secret_token, Telegram не сообщает вовсе. Здесь
+            # раньше стояло has_custom_certificate — это про SSL-сертификат,
+            # к секрету отношения не имеет, и строка показывала «да» просто
+            # потому, что вебхук существует. Врущая строка в диагностике
+            # хуже отсутствующей: по ней и принимают неверные решения.
+            f"Ждёт обновлений с: {info.get('ip_address') or '—'}",
             f"Необработанных обновлений: {info.get('pending_update_count', '—')}",
             f"Последняя ошибка: {info.get('last_error_message') or 'нет'}",
         ]
