@@ -51,6 +51,7 @@ PUBLISH = (
     "story.json",
     "metrics.json",
     "removal.json",
+    "funnel.json",
 )
 
 results: list[tuple[str, bool, str]] = []
