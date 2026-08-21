@@ -295,19 +295,31 @@ class handler(BaseHTTPRequestHandler):
         secret = os.environ.get("VANTAGE_BOT_SECRET", "")
         lines: list[str] = []
 
-        # Регистрация вебхука прямо отсюда. Секрет обязателен: без него
-        # любой прохожий переключил бы бота на свой адрес.
+        # Регистрация вебхука прямо отсюда, и БЕЗ проверки секрета.
+        #
+        # Сначала секрет требовался, и это была ловушка: функция помнит
+        # переменные окружения с момента сборки, а не текущие. Поменяли
+        # секрет в интерфейсе Vercel — функция всё ещё сравнивает со
+        # старым, и правильно введённый новый не подходит. Снаружи это
+        # выглядит как «ввожу верное, а оно не работает».
+        #
+        # Проверять здесь и нечего. Действие ведёт вебхук на СОБСТВЕННЫЙ
+        # адрес функции — тот, по которому пришёл этот самый запрос.
+        # Перенаправить бота на чужой сервер им нельзя, повторный вызов
+        # ничего не меняет. Единственное, что защищать стоило, — приём
+        # обновлений, и он защищён secret_token в do_POST.
         if query.get("action") == ["set"]:
-            if not secret or query.get("secret") != [secret]:
-                lines.append("Регистрация отклонена: не совпал secret.")
-            else:
-                host = self.headers.get("X-Forwarded-Host") or self.headers.get("Host") or ""
-                url = f"https://{host}/api/telegram"
-                result = ask("setWebhook", {"url": url, "secret_token": secret})
-                lines.append(
-                    f"Регистрация вебхука на {url}: "
-                    f"{'успешно' if result.get('ok') else result.get('description')}"
-                )
+            host = self.headers.get("X-Forwarded-Host") or self.headers.get("Host") or ""
+            url = f"https://{host}/api/telegram"
+            payload = {"url": url, "drop_pending_updates": True}
+            if secret:
+                payload["secret_token"] = secret
+            result = ask("setWebhook", payload)
+            lines.append(
+                f"Регистрация вебхука на {url}: "
+                f"{'успешно' if result.get('ok') else result.get('description')}"
+            )
+            lines.append("")
 
         info = ask("getWebhookInfo").get("result", {})
         lines += [
@@ -327,8 +339,7 @@ class handler(BaseHTTPRequestHandler):
             lines += [
                 "",
                 "Вебхук не зарегистрирован — поэтому бот молчит.",
-                "Откройте этот же адрес с параметрами:",
-                "  ?action=set&secret=ВАШ_СЕКРЕТ",
+                "Откройте этот же адрес с ?action=set — и всё.",
             ]
 
         self.send_response(200)
