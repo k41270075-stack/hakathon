@@ -52,6 +52,7 @@ const STAGE_TEXT: Record<string, { label: string; detail: string }> = {
 };
 
 type Funnel = { raw: number; rejected: Record<string, number> };
+type Metrics = { lift: number; pr_auc_future: number; base_rate_future: number };
 
 function stagesFrom(funnel: Funnel | null): Stage[] {
   if (!funnel?.rejected) return [];
@@ -141,11 +142,16 @@ export default function App() {
      Складывать ущерб по складу под синей кровлей значит завышать итог, и
      первый же вопрос «а что вот это» обесценит всю цифру. */
   const [funnel, setFunnel] = useState<Funnel | null>(null);
+  const [metrics, setMetrics] = useState<Metrics | null>(null);
   useEffect(() => {
     fetch('./data/funnel.json')
       .then((r) => (r.ok ? r.json() : null))
       .then(setFunnel)
       .catch(() => setFunnel(null));
+    fetch('./data/metrics.json')
+      .then((r) => (r.ok ? r.json() : null))
+      .then(setMetrics)
+      .catch(() => setMetrics(null));
   }, []);
 
   const totals = useMemo(() => {
@@ -422,10 +428,16 @@ export default function App() {
               </a>
             </div>
             <dl className="grid grid-cols-2 gap-6 border-l border-grid pl-8">
+              {/* Метрики читаются из metrics.json, который пишет прогон.
+                  Вписанные руками уже разошлись: после пересчёта по всему
+                  кольцу выигрыш стал ×301, PR-AUC 0,046, базовая частота
+                  0,00015 — а на странице стояли числа предыдущего прогона.
+                  Числа модели, не совпадающие с её же выгрузкой, — первое,
+                  что проверяют на техническом Q&A. */}
               {[
-                ['Точнее случайного', '×293'],
-                ['PR-AUC', '0,120'],
-                ['Базовая частота', '0,0004'],
+                ['Точнее случайного', metrics ? `×${Math.round(metrics.lift)}` : '—'],
+                ['PR-AUC', metrics ? metrics.pr_auc_future.toFixed(3).replace('.', ',') : '—'],
+                ['Базовая частота', metrics ? metrics.base_rate_future.toFixed(5).replace('.', ',') : '—'],
                 ['Ячеек в сетке', '19 621'],
               ].map(([k, v]) => (
                 <div key={k}>

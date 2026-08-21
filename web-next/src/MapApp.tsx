@@ -150,6 +150,18 @@ export default function MapApp() {
   const [candidates, setCandidates] = useState<GeoJSON.FeatureCollection | null>(null);
   const [registry, setRegistry] = useState<GeoJSON.FeatureCollection | null>(null);
   const [risk, setRisk] = useState<GeoJSON.FeatureCollection | null>(null);
+  /* Сколько кандидатов рассмотрел детектор — из воронки, а не числом в
+     коде. Вписанное «429» пережило пересчёт и стало неправдой: сырых
+     кандидатов теперь 385. Соседняя цифра в той же фразе при этом
+     считалась из данных, так что предложение противоречило само себе. */
+  const [raw, setRaw] = useState<number | null>(null);
+  useEffect(() => {
+    fetch('./data/funnel.json')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setRaw(typeof d?.raw === 'number' ? d.raw : null))
+      .catch(() => setRaw(null));
+  }, []);
+
   const [selected, setSelected] = useState<string | null>(null);
   const [sort, setSort] = useState<SortKey>('visual');
   const [basemap, setBasemap] = useState<Basemap>('sat');
@@ -445,7 +457,7 @@ export default function MapApp() {
             <div className="px-5 py-8">
               <h2 className="text-xl text-line">Выберите объект</h2>
               <p className="mt-3 max-w-[34ch] text-sm text-muted">
-                В реестре слева {totals.count} объектов, отобранных из 429.
+                В реестре слева {totals.count} объектов{raw ? `, отобранных из ${raw}` : ''}.
                 Каждый просмотрен глазами на снимке 0,6 м на пиксель:{' '}
                 <span className="text-line">{totals.confirmed}</span> подтверждены как
                 свалки, остальные оказались постройками, промплощадками и
