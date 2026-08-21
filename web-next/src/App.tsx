@@ -18,6 +18,7 @@ import { Tape } from './components/Tape';
 import { Plates } from './components/Plates';
 import { Funnel, YearBars, DamageStrip } from './components/Charts';
 import { SiteView } from './components/SiteView';
+import { Rejected } from './components/Rejected';
 
 type Series = Parameters<typeof Tape>[0]['data'];
 type Feature = GeoJSON.Feature<GeoJSON.Geometry, Record<string, unknown>>;
@@ -323,6 +324,8 @@ export default function App() {
           </p>
           <Funnel stages={STAGES} kept={totals.count || 30} />
         </section>
+
+        <Rejected features={features as never} />
 
         {/* ── Когда и почём ─────────────────────────────────────────── */}
         <section className="border-t border-grid pt-14 pb-16">
