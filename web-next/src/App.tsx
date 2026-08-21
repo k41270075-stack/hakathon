@@ -88,21 +88,30 @@ export default function App() {
       .catch(() => setFeatures([]));
   }, []);
 
-  /* Герой — самый крупный подтверждённый объект, а не выбранный вручную.
-     Выбранный вручную пришлось бы менять после каждого прогона, и рано
-     или поздно на лендинге оказался бы объект, которого больше нет. */
+  /* Герой — самый крупный из подтверждённых ГЛАЗАМИ, а не выбранный
+     вручную и не подтверждённый автоматикой. Раньше здесь стоял объект с
+     verify_confirmed, и на лендинг попадал склад: доверификация сверяет
+     текстуру, а не смысл. Выбранный вручную пришлось бы менять после
+     каждого прогона. */
   const hero = useMemo(() => {
-    const confirmed = features.filter((f) => f.properties?.verify_confirmed === true);
+    const confirmed = features.filter((f) => f.properties?.visual_check === 'landfill');
     const pool = confirmed.length ? confirmed : features;
     return [...pool].sort(
       (a, b) => (Number(b.properties?.area_m2) || 0) - (Number(a.properties?.area_m2) || 0),
     )[0] ?? null;
   }, [features]);
 
+  /* Суммы считаются без объектов, отвергнутых проверкой глазами.
+     Складывать ущерб по складу под синей кровлей значит завышать итог, и
+     первый же вопрос «а что вот это» обесценит всю цифру. */
   const totals = useMemo(() => {
-    const damage = features.reduce((s, f) => s + (Number(f.properties?.damage_p50) || 0), 0);
-    const area = features.reduce((s, f) => s + (Number(f.properties?.area_m2) || 0), 0);
-    return { count: features.length, damage, area };
+    const real = features.filter((f) => f.properties?.visual_check !== 'not_landfill');
+    return {
+      count: features.length,
+      confirmed: features.filter((f) => f.properties?.visual_check === 'landfill').length,
+      damage: real.reduce((s, f) => s + (Number(f.properties?.damage_p50) || 0), 0),
+      area: real.reduce((s, f) => s + (Number(f.properties?.area_m2) || 0), 0),
+    };
   }, [features]);
 
   return (
@@ -172,8 +181,8 @@ export default function App() {
 
               <dl className="mt-8 grid grid-cols-3 gap-4 border-t border-grid pt-6">
                 {[
-                  ['Объектов', String(totals.count)],
-                  ['Площадь', `${num(totals.area / 10000, 1)} га`],
+                  ['Найдено', String(totals.count)],
+                  ['Подтверждено глазами', String(totals.confirmed)],
                   ['Ущерб', kzt(totals.damage)],
                 ].map(([k, v]) => (
                   <div key={k}>
@@ -207,7 +216,7 @@ export default function App() {
                     ['Возник', humanDate(hero.properties?.break_date)],
                     ['Площадь', `${num(Number(hero.properties?.area_m2))} м²`],
                     ['Ущерб', kzt(Number(hero.properties?.damage_p50))],
-                    ['Подтверждён', `${num(Number(hero.properties?.n_agreeing))} источника`],
+                    ['Проверен', 'глазами, 0,6 м/пиксель'],
                   ].map(([k, v]) => (
                     <div key={k}>
                       <dt className="text-xs text-muted-2">{k}</dt>

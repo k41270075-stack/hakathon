@@ -11,3 +11,25 @@
 18:23:29 Месячных композитов после отбраковки: 61
 C:\Users\Админ\OneDrive\Жұмыс үстелі\Новая папка (3)\vantage\.venv\lib\site-packages\rasterio\warp.py:387: NotGeoreferencedWarning: Dataset has no geotransform, gcps, or rpcs. The identity matrix will be returned.
   dest = _reproject(
+18:40:52 CPLE_AppDefined:Request for 86715217-87404726 failed with response_code=206
+18:40:55 CPLE_AppDefined:Request for 76452865-77217416 failed with response_code=206
+18:40:56 CPLE_AppDefined:Request for 98445025-99223742 failed with response_code=206
+18:40:57 CPLE_AppDefined:Request for 72746154-73494453 failed with response_code=206
+18:40:58 CPLE_AppDefined:Request for 69425906-70120802 failed with response_code=206
+18:41:01 CPLE_AppDefined:Request for 100226896-101020736 failed with response_code=206
+18:41:03 CPLE_AppDefined:Request for 73217732-73974062 failed with response_code=206
+18:41:09 CPLE_AppDefined:Request for 78801932-79595611 failed with response_code=206
+18:41:35 CPLE_AppDefined:Request for 109878615-110707430 failed with response_code=206
+18:41:48 CPLE_AppDefined:Request for 89884035-90639492 failed with response_code=206
+18:41:52 CPLE_AppDefined:Request for 93568733-94313667 failed with response_code=206
+18:41:55 CPLE_AppDefined:Request for 76452865-77217416 failed with response_code=206
+18:41:56 CPLE_AppDefined:Request for 79223254-80012843 failed with response_code=0
+18:41:56 CPLE_AppDefined:Request for 98445025-99223742 failed with response_code=206
+18:41:57 CPLE_AppDefined:Request for 78752180-79525868 failed with response_code=206
+18:42:01 CPLE_AppDefined:Request for 100226896-101020736 failed with response_code=206
+18:42:09 CPLE_AppDefined:Request for 72678336-73426094 failed with response_code=206
+18:42:09 CPLE_AppDefined:Request for 78801932-79595611 failed with response_code=206
+18:42:35 CPLE_AppDefined:Request for 109878615-110707430 failed with response_code=206
+18:42:48 CPLE_AppDefined:Request for 89884035-90639492 failed with response_code=206
+18:43:46 CPLE_AppDefined:Request for 77862821-78658780 failed with response_code=206
+18:43:53 CPLE_AppDefined:Request for 90795610-91535479 failed with response_code=206
