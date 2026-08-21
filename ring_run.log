@@ -33,3 +33,14 @@ C:\Users\Админ\OneDrive\Жұмыс үстелі\Новая папка (3)\v
 18:42:48 CPLE_AppDefined:Request for 89884035-90639492 failed with response_code=206
 18:43:46 CPLE_AppDefined:Request for 77862821-78658780 failed with response_code=206
 18:43:53 CPLE_AppDefined:Request for 90795610-91535479 failed with response_code=206
+18:50:04 Детекция изменений: {'pixels': 287296, 'detected': 1690, 'detected_pct': 0.588, 'rejected_recovered': 237305, 'insufficient_data': 0}
+18:50:04 Связных областей после чистки: 37
+18:50:04 Кандидатов собрано: 37, суммарная площадь 5.7 га
+18:50:51 Извлечено 37 пар чипов, 9 каналов
+18:50:51 Сохранено 37 пар чипов в data\chips\astana_north_x002y001.npz
+18:50:51 Created 37 records
+18:50:51 Записано 37 кандидатов в outputs_real\tiles\astana_north_x002y001.geojson
+18:50:51 [8/25] astana_north_x002y001 — кандидатов 37 (1772 с от начала)
+18:51:07 STAC sentinel-2-l2a: найдено 801 сцен для astana_north_x003y001 (2018-01-01..2026-08-01)
+18:51:09 Загружен куб S2: 440 дат, 536 x 536 пикселей
+18:51:12 Месячных композитов после отбраковки: 61
