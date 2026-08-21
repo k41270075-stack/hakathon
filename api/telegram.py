@@ -48,6 +48,7 @@ import hashlib
 import json
 import math
 import os
+import re
 import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler
@@ -120,6 +121,40 @@ def hash_sender(sender_id) -> str:
     return hashlib.sha256(f"{salt}:{sender_id}".encode()).hexdigest()[:16]
 
 
+#: Как выглядит токен: числовой идентификатор бота, двоеточие, ключ.
+TOKEN_RE = re.compile(r"\d{6,}:[A-Za-z0-9_-]{30,}")
+
+
+def token() -> str:
+    """Токен, выковырянный из того, что положили в переменную.
+
+    BotFather присылает токен внутри длинного поздравительного сообщения,
+    и вставить в переменную окружения всё сообщение целиком — ошибка,
+    которую делают все. Пробелы и переводы строк внутри значения приводят
+    к отказу «URL can't contain control characters», а текст отказа
+    содержит само значение — то есть утекает наружу.
+
+    Поэтому здесь не проверка, а извлечение: берём из значения то, что
+    похоже на токен, и работаем с ним.
+    """
+    raw = os.environ.get("VANTAGE_BOT_TOKEN", "")
+    found = TOKEN_RE.search(raw)
+    return found.group(0) if found else raw.strip()
+
+
+def hide_token(text: str) -> str:
+    """Убрать токен из любого текста, который может попасть наружу.
+
+    Страница состояния публичная. Один раз токен уже уехал в неё через
+    текст ошибки от urllib — там был полный адрес запроса вместе с
+    ключом. Ошибки печатать надо, ключи — нет.
+    """
+    value = token()
+    if value:
+        text = text.replace(value, "<токен скрыт>")
+    return TOKEN_RE.sub("<токен скрыт>", text)
+
+
 def ask(method: str, payload: dict | None = None) -> dict:
     """Вызов Telegram с возвратом ответа.
 
@@ -127,18 +162,18 @@ def ask(method: str, payload: dict | None = None) -> dict:
     регистрация. Для отправки сообщений есть `call`, который ответ
     выбрасывает.
     """
-    token = os.environ.get("VANTAGE_BOT_TOKEN")
-    if not token:
+    value = token()
+    if not value:
         return {"ok": False, "description": "VANTAGE_BOT_TOKEN не задан"}
     request = urllib.request.Request(
-        API.format(token=token, method=method),
+        API.format(token=value, method=method),
         data=json.dumps(payload or {}).encode("utf-8"),
         headers={"Content-Type": "application/json"},
     )
     try:
         return json.loads(urllib.request.urlopen(request, timeout=10).read())
-    except Exception as error:  # текст ошибки и есть ответ
-        return {"ok": False, "description": str(error)}
+    except Exception as error:  # текст ошибки и есть ответ, но без ключа
+        return {"ok": False, "description": hide_token(str(error))}
 
 
 def call(method: str, payload: dict) -> None:
@@ -325,7 +360,7 @@ class handler(BaseHTTPRequestHandler):
         lines += [
             "Vantage AI bot",
             f"Объектов в указателе: {len(candidates())}",
-            f"Токен задан: {'да' if os.environ.get('VANTAGE_BOT_TOKEN') else 'НЕТ'}",
+            f"Токен задан: {'да' if token() else 'НЕТ'}",
             f"Секрет задан: {'да' if secret else 'НЕТ'}",
             f"Подписчиков: {len(subscribers()) or 'НЕТ'}",
             "",
@@ -345,4 +380,4 @@ class handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "text/plain; charset=utf-8")
         self.end_headers()
-        self.wfile.write(chr(10).join(lines).encode())
+        self.wfile.write(hide_token(chr(10).join(lines)).encode())
