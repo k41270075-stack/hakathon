@@ -158,8 +158,8 @@ export default function App() {
                   видит страницу впервые: он не знает ни что за свалка, ни
                   чей это сайт, ни что ему предлагают. История объекта —
                   хорошее второе предложение и плохое первое. */}
-              <h1 className="max-w-[17ch] text-[clamp(2.1rem,5vw,3.5rem)] leading-[1.04] text-line">
-                Находим стихийные свалки на спутниковых снимках
+              <h1 className="max-w-[15ch] text-[clamp(2.2rem,5.2vw,3.7rem)] leading-[1.04] text-line">
+                Находим свалки на спутниковых снимках
               </h1>
               <p className="mt-5 max-w-[48ch] text-lg leading-relaxed text-muted">
                 Программа читает восемь лет архива и ищет места, где

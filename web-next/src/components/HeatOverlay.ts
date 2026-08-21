@@ -116,8 +116,13 @@ export class HeatOverlay extends L.Layer {
 
   /* Левый верхний угол холста в координатах слоя — начало отсчёта при
      рисовании. Панорамирование Leaflet двигает сам, поэтому пересчитывать
-     его нужно только при изменении вида. */
+     его нужно только при изменении вида.
+
+     Центр и зум на момент отрисовки нужны для зума: смещение считается ОТ
+     того вида, в котором нарисованы пиксели, а не от текущего. */
   private origin: L.Point | null = null;
+  private drawnCenter: L.LatLng | null = null;
+  private drawnZoom = 0;
 
   constructor(points: HeatPoint[] = [], options: Options = {}) {
     super();
@@ -152,8 +157,24 @@ export class HeatOverlay extends L.Layer {
      * пересчитанным на зумэнде. Жест становится мгновенным, а тепло —
      * правильным, вместо «плавно, но и не то, и с рывками».
      */
-    map.on('zoomstart', this.hide, this);
-    map.on('zoomend', this.show, this);
+    /* Холст едет вместе с картой, а не прячется на время жеста.
+     *
+     * Прятать было дёшево, но пропадающая на полсекунды поверхность
+     * заметнее любых рывков: глаз ловит именно исчезновение. Плавность
+     * здесь важнее экономии.
+     *
+     * Экономия при этом никуда не делась, просто взята в другом месте:
+     * холст рисуется вдвое мельче экрана и с запасом в 8% вместо 18%.
+     * Двести восемьдесят тысяч пикселей вместо полутора миллионов
+     * переклеиваются на кадре зума незаметно.
+     *
+     * Событие zoom идёт непрерывно и при колесе, и при щипке; zoomanim —
+     * только когда включена анимация. Нужны оба: без первого холст стоит
+     * до конца жеста, без второго дёргается в конце. */
+    map.on('zoom', this.onZoom, this);
+    if (map.options.zoomAnimation && L.Browser.any3d) {
+      map.on('zoomanim', this.onZoomAnim, this);
+    }
     this.reset();
     return this;
   }
@@ -161,8 +182,8 @@ export class HeatOverlay extends L.Layer {
   onRemove(map: L.Map): this {
     if (this.frame) { cancelAnimationFrame(this.frame); this.frame = 0; }
     map.off('moveend zoomend resize', this.reset, this);
-    map.off('zoomstart', this.hide, this);
-    map.off('zoomend', this.show, this);
+    map.off('zoom', this.onZoom, this);
+    map.off('zoomanim', this.onZoomAnim, this);
     this.canvas?.remove();
     this.canvas = null;
     this.ctx = null;
@@ -199,12 +220,36 @@ export class HeatOverlay extends L.Layer {
     });
   }
 
-  private hide() {
-    if (this.canvas) this.canvas.style.visibility = 'hidden';
+  /* Формула — та же, которой пользуется собственный canvas-рендерер
+     Leaflet. Первая версия считала смещение через _getCenterOffset и
+     уезжала: та величина отсчитывается от текущего вида карты, а пиксели
+     на холсте нарисованы в предыдущем. */
+  private updateTransform(center: L.LatLng, zoom: number) {
+    const map = this._map;
+    if (!map || !this.canvas || !this.drawnCenter) return;
+
+    const inner = map as unknown as {
+      _getNewPixelOrigin(center: L.LatLng, zoom: number): L.Point;
+    };
+    const scale = map.getZoomScale(zoom, this.drawnZoom);
+    const viewHalf = map.getSize().multiplyBy(0.5 + PAD);
+    const drawnCenterNow = map.project(this.drawnCenter, zoom);
+    const offset = viewHalf
+      .multiplyBy(-scale)
+      .add(drawnCenterNow)
+      .subtract(inner._getNewPixelOrigin(center, zoom));
+
+    L.DomUtil.setTransform(this.canvas, offset, scale);
   }
 
-  private show() {
-    if (this.canvas) this.canvas.style.visibility = 'visible';
+  private onZoomAnim(event: L.ZoomAnimEvent) {
+    this.updateTransform(event.center, event.zoom);
+  }
+
+  private onZoom() {
+    const map = this._map;
+    if (!map) return;
+    this.updateTransform(map.getCenter(), map.getZoom());
   }
 
   private reset() {
@@ -229,6 +274,8 @@ export class HeatOverlay extends L.Layer {
     // Левый верхний угол холста в координатах слоя. Он же начало отсчёта
     // при рисовании — иначе позиция пятен и позиция холста разъезжаются.
     this.origin = map.containerPointToLayerPoint(size.multiplyBy(-PAD)).round();
+    this.drawnCenter = map.getCenter();
+    this.drawnZoom = map.getZoom();
 
     L.DomUtil.setTransform(canvas, this.origin, 1);
     this.draw();
