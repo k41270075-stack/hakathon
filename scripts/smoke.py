@@ -21,6 +21,13 @@
 регулярно отдаёт 404 на отдельные квадраты, это его нормальная работа, а
 не наша поломка.
 
+Отменённые запросы (ERR_ABORTED) тоже не считаются, и это не послабление.
+Отмена — действие самой страницы, а не отказ сервера: браузер так
+сообщает, например, о завершённом HEAD без тела. Первый запуск теста
+объявил поломкой работающую проверку наличия ролика — файл лежал на
+месте, отдавался с кодом 200, и страница правильно показывала «Скачать
+видео». Тест, который кричит на исправное, перестают читать.
+
     python scripts/smoke.py
 """
 
@@ -30,6 +37,15 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+
+# Вывод форсируется в UTF-8. Без этого скрипт падает на собственной
+# рамке: запущенный из цепочки, он получает консольную кодировку cp1251,
+# в которой символов ── просто нет, и UnicodeEncodeError убивает отчёт
+# ПОСЛЕ того, как проверка уже прошла, — то есть теряется именно
+# результат, ради которого всё запускалось.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 DIST = Path("web-next/dist")
 PORT = 8098
@@ -90,7 +106,8 @@ def main() -> int:
                 page.on("pageerror", lambda e: errors.append(f"исключение: {e}"))
                 page.on("requestfailed", lambda r: (
                     failures.append(f"{r.url[:90]} — {r.failure}")
-                    if not any(host in r.url for host in FOREIGN) else None
+                    if not any(host in r.url for host in FOREIGN)
+                    and "ERR_ABORTED" not in (r.failure or "") else None
                 ))
 
                 try:
