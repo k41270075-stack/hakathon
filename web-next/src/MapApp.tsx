@@ -545,6 +545,37 @@ function ObjectCard({ f }: { f: Feature }) {
         </div>
       )}
 
+      {/* Оценка по снимку высокого разрешения.
+       *
+       * Модель обучена на AerialWaste (Politecnico di Milano) и проверена
+       * на наших объектах: ROC-AUC 0,786 при интервале 0,571–0,968.
+       * Поведение на концах шкалы разное, и это решает, что показывать:
+       * все шесть объектов с оценкой ниже 0,35 оказались не свалками, а
+       * наверху два склада получили 0,999 и 0,982.
+       *
+       * Поэтому уверенный вывод выносится ТОЛЬКО для нижнего конца.
+       * Наверху честнее написать «не различает», чем выдать самую
+       * ошибочную часть шкалы за уверенность. */}
+      {typeof p.highres_score === 'number' && (
+        <div className="mt-3 rounded-sm border border-grid bg-soot-2 px-3 py-2.5">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-xs text-muted-2">Модель по снимку 0,5 м</span>
+            <span
+              className={`text-sm ${
+                p.highres_score < 0.35 ? 'text-rose-300' : 'text-muted'
+              }`}
+            >
+              {String(p.highres_verdict ?? '')}
+            </span>
+          </div>
+          <p className="mt-1.5 text-xs leading-snug text-muted-2">
+            {p.highres_score < 0.35
+              ? `Оценка ${p.highres_score.toFixed(2)}. На контрольной выборке все шесть объектов с оценкой ниже 0,35 оказались не свалками — здесь модели можно верить.`
+              : `Оценка ${p.highres_score.toFixed(2)}. Выше 0,35 модель ошибается: склады получали и 0,99. Решает человек.`}
+          </p>
+        </div>
+      )}
+
       <div className="mt-3 rounded-sm border border-grid bg-soot-2 px-3 py-2.5">
         <div className="flex items-baseline justify-between gap-3">
           <span className="text-xs text-muted-2">Вероятность модели</span>
