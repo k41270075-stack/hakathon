@@ -116,9 +116,24 @@ const removalOf = (p: Props) => {
 const kzt = (v: unknown) => {
   const n = Number(v);
   if (!Number.isFinite(n)) return '—';
-  if (Math.abs(n) >= 1e9) return `${(n / 1e9).toFixed(1)} млрд ₸`;
-  if (Math.abs(n) >= 1e6) return `${(n / 1e6).toFixed(1)} млн ₸`;
+  // Запятая, а не точка: по-русски дробная часть отделяется запятой, и
+  // «37.9 млн» рядом с «1,5 га» на той же полосе читается как опечатка.
+  const one = (x: number) => x.toFixed(1).replace('.', ',');
+  if (Math.abs(n) >= 1e9) return `${one(n / 1e9)} млрд ₸`;
+  if (Math.abs(n) >= 1e6) return `${one(n / 1e6)} млн ₸`;
   return `${Math.round(n / 1e3).toLocaleString('ru-RU')} тыс ₸`;
+};
+
+/** Согласовать существительное с числом. «21 объектов» замечают раньше,
+ *  чем содержание фразы, а числа теперь приходят из данных и подогнать
+ *  формулировку под одно из них нельзя. */
+const plural = (count: number, one: string, few: string, many: string) => {
+  const mod100 = Math.abs(count) % 100;
+  if (mod100 >= 11 && mod100 <= 14) return many;
+  const mod10 = mod100 % 10;
+  if (mod10 === 1) return one;
+  if (mod10 >= 2 && mod10 <= 4) return few;
+  return many;
 };
 
 const num = (v: unknown, d = 0) => {
@@ -457,7 +472,9 @@ export default function MapApp() {
             <div className="px-5 py-8">
               <h2 className="text-xl text-line">Выберите объект</h2>
               <p className="mt-3 max-w-[34ch] text-sm text-muted">
-                В реестре слева {totals.count} объектов{raw ? `, отобранных из ${raw}` : ''}.
+                В реестре слева {totals.count}{' '}
+                {plural(totals.count, 'объект', 'объекта', 'объектов')}
+                {raw ? `, отобранных из ${raw}` : ''}.
                 Каждый просмотрен глазами на снимке 0,6 м на пиксель:{' '}
                 <span className="text-line">{totals.confirmed}</span> подтверждены как
                 свалки, остальные оказались постройками, промплощадками и
