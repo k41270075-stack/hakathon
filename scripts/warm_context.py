@@ -19,6 +19,12 @@ import sys
 import time
 from pathlib import Path
 
+# Вывод в UTF-8: рамки и кириллица не влезают в консольную cp1251, и
+# скрипт падал на последней строке отчёта — уже ПОСЛЕ того, как всю
+# работу сделал.
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
 
 def main() -> int:
     import yaml
