@@ -11,13 +11,25 @@
  * после чего тихо становится ложью.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { Logo, Mark } from './components/Logo';
 import { Nav } from './components/Nav';
 import { Tape } from './components/Tape';
 import { Plates } from './components/Plates';
 import { Funnel, YearBars, DamageStrip, type Stage } from './components/Charts';
-import { SiteView } from './components/SiteView';
+/* SiteView грузится отдельно и только когда до него дошли.
+ *
+ * Внутри Leaflet — 146 КБ, и до этой правки он тянулся при открытии
+ * лендинга ради одной врезки, лежащей ниже сгиба. На канале 400 кбит/с
+ * первая отрисовка занимала 12,8 секунды против полутора у карты и
+ * прогноза: посетитель полминуты смотрел на пустоту ради картинки,
+ * которую ещё не видит.
+ *
+ * Заглушка держит место точно того же размера — иначе страница дёргается,
+ * когда врезка приезжает. */
+const SiteView = lazy(() =>
+  import('./components/SiteView').then((m) => ({ default: m.SiteView })),
+);
 
 type Series = Parameters<typeof Tape>[0]['data'];
 type Feature = GeoJSON.Feature<GeoJSON.Geometry, Record<string, unknown>>;
@@ -351,7 +363,11 @@ export default function App() {
                 Все {totals.real} объектов на карте →
               </a>
             </div>
-            <SiteView feature={hero} className="aspect-[4/3] w-full" />
+            <Suspense
+              fallback={<div className="aspect-[4/3] w-full rounded-sm border border-grid bg-soot-2" />}
+            >
+              <SiteView feature={hero} className="aspect-[4/3] w-full" />
+            </Suspense>
           </div>
         </section>
 
