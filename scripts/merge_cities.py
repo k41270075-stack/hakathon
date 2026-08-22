@@ -144,6 +144,18 @@ def main() -> int:
             shutil.copy2(item, WEB / item.name)
             copied += 1
 
+    # Слияние копирует в выгрузку НАПРЯМУЮ и тем самым обходит фильтр
+    # публикации: объединённый список содержит и отвергнутые объекты со
+    # всех поясов. Без этого вызова они разом вернулись бы на сайт — тот
+    # же тихий откат, что уже ловился проверкой в конце досчёта.
+    import subprocess
+
+    log.info("")
+    log.info("── Фильтр публикации по объединённому набору")
+    subprocess.run([sys.executable, "scripts/publish_filter.py",
+                    "--outputs", str(MERGED)], check=False)
+    subprocess.run([sys.executable, "scripts/make_bot_index.py"], check=False)
+
     log.info("")
     log.info("── Объединено ──")
     for city, count in totals.items():
