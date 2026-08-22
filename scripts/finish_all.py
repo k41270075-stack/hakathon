@@ -160,6 +160,10 @@ def verify_published() -> bool:
     if bad:
         log.error("   в выгрузке %d отвергнутых объектов — прогоняю фильтр заново", len(bad))
         subprocess.run([sys.executable, "scripts/publish_filter.py"], check=False)
+        # Указатель бота собирается ИЗ выгрузки и уже устарел: если его не
+        # пересобрать, житель пришлёт точку у склада и получит ответ
+        # «объект известен». Хуже, чем молчание.
+        subprocess.run([sys.executable, "scripts/make_bot_index.py"], check=False)
         results.append(("Проверка выгрузки", False, f"было отвергнутых: {len(bad)}, фильтр повторён"))
         return False
 

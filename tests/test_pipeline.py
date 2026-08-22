@@ -421,3 +421,35 @@ class TestPublishedOutputIsFiltered:
             f"в выгрузке {len(rejected)} отвергнутых объектов: {rejected[:5]}. "
             "Какой-то шаг досчёта переписал файл после фильтра публикации"
         )
+
+
+class TestBotIndexMatchesSite:
+    """Указатель бота и карта должны показывать один и тот же список.
+
+    Указатель собирается ИЗ выгрузки, но собирается отдельным шагом. Стоит
+    любому шагу переписать выгрузку после него — и бот начинает отвечать
+    про объекты, которых на карте уже нет.
+
+    Цена расхождения выше, чем кажется: житель присылает точку у склада и
+    получает «объект известен, площадь такая-то». Это хуже молчания —
+    молчание видно, а уверенный неверный ответ нет.
+    """
+
+    def test_same_object_ids(self):
+        import json
+        from pathlib import Path
+
+        bot = Path("api/candidates.json")
+        site = Path("web-next/public/data/candidates.geojson")
+        if not bot.exists() or not site.exists():
+            pytest.skip("прогон не запускался")
+
+        in_bot = {x["id"] for x in json.loads(bot.read_text(encoding="utf-8"))}
+        in_site = {
+            (f.get("properties") or {}).get("candidate_id")
+            for f in json.loads(site.read_text(encoding="utf-8")).get("features", [])
+        }
+        assert in_bot == in_site, (
+            f"только в боте: {sorted(in_bot - in_site)[:5]}, "
+            f"только на сайте: {sorted(in_site - in_bot)[:5]}"
+        )
