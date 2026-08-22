@@ -24,7 +24,8 @@
 копирует на сайт. Папка одного города остаётся нетронутой, и вернуться к
 ней можно в любой момент.
 
-    python scripts/merge_cities.py astana:outputs_real astana_east \n                                   astana_southeast astana_west
+    python scripts/merge_cities.py astana:outputs_real astana_east
+                                   astana_southeast astana_west
 """
 
 import json
