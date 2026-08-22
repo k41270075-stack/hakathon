@@ -134,9 +134,25 @@ def build_cities() -> bool:
 
         cities = yaml.safe_load(Path("config/cities.yaml").read_text(encoding="utf-8"))["cities"]
         found = gpd.read_file(WEB_DATA / "candidates.geojson")
+
+        # Области перекрываются по краям: северное кольцо и юго-восточный
+        # пояс делят полосу шириной 6 км. Объект из этой полосы засчитывался
+        # обеим, и на кнопке «Юго-восток» стояла единица — при том что
+        # настоящих находок там ноль из 63 просмотренных. Кнопка обещала
+        # объект, которого в этой области нет.
+        #
+        # Поэтому объект достаётся первой области, чьи границы его
+        # накрывают: порядок в cities.yaml идёт от того, где считали
+        # раньше, и это же порядок, в котором объект получил свой номер.
+        taken: set = set()
         out = []
         for city in cities:
-            inside = found[found.geometry.intersects(box(*city["bbox"]))] if not found.empty else found
+            if found.empty:
+                inside = found
+            else:
+                hit = found[found.geometry.intersects(box(*city["bbox"]))]
+                inside = hit[~hit["candidate_id"].isin(taken)]
+                taken.update(inside["candidate_id"])
 
             # Сколько находок дошло до просмотра. Берётся из папки прогона,
             # а не из выгрузки: в выгрузке отвергнутых уже нет.
