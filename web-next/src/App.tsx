@@ -296,7 +296,7 @@ export default function App() {
               <dl className="mt-8 grid grid-cols-3 border-t border-grid pt-6">
                 {[
                   ['Объектов в списке', String(totals.real), false],
-                  ['Из них опознаны как свалка', String(totals.confirmed), true],
+                  ['Опознаны как свалка', String(totals.confirmed), true],
                   ['Ущерб по списку', kzt(totals.damage), false],
                 ].map(([k, v, accent], i) => (
                   <div
