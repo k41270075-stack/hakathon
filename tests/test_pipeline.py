@@ -388,3 +388,36 @@ class TestAoiReachesEveryStep:
             f"отсев спросил OSM про {seen}, а должен был про almaty — "
             "кандидаты сравнятся с дорогами чужого города"
         )
+
+
+class TestPublishedOutputIsFiltered:
+    """В выгрузке не должно оставаться объектов, отвергнутых проверкой.
+
+    Фильтр публикации стоит последним шагом досчёта, но «последним» его
+    делает порядок строк в scripts/finish_all.py, а не что-либо ещё. Любой
+    шаг, дописанный ниже и переписывающий candidates.geojson целиком,
+    вернёт отвергнутые на сайт.
+
+    Заметить это нечем: файл на месте, объекты на месте, просто их снова
+    сорок девять вместо четырнадцати. Так и произошло в ночь на 23
+    августа — досчёт вернул на сайт всё, что фильтр убрал часом раньше.
+    """
+
+    def test_no_rejected_objects_in_published_file(self):
+        import json
+        from pathlib import Path
+
+        published = Path("web-next/public/data/candidates.geojson")
+        if not published.exists():
+            pytest.skip("выгрузки нет — прогон не запускался")
+
+        data = json.loads(published.read_text(encoding="utf-8"))
+        rejected = [
+            (f.get("properties") or {}).get("candidate_id")
+            for f in data.get("features", [])
+            if (f.get("properties") or {}).get("visual_check") == "not_landfill"
+        ]
+        assert not rejected, (
+            f"в выгрузке {len(rejected)} отвергнутых объектов: {rejected[:5]}. "
+            "Какой-то шаг досчёта переписал файл после фильтра публикации"
+        )
