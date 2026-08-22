@@ -449,6 +449,47 @@ export default function App() {
           </div>
         </section>
 
+        {/* ── Масштаб ───────────────────────────────────────────────
+            Скорость измерена на настоящих прогонах, а не выведена из
+            спецификаций: кольцо 406 км² за четыре часа на этой самой
+            машине. Умножать читатель умеет сам, и умноженное им число
+            убедительнее названного нами. */}
+        <section className="border-t border-grid pt-14 pb-16">
+          <h2 className="max-w-[24ch] text-[clamp(1.7rem,3.6vw,2.6rem)] text-line">
+            Сто два квадратных километра в час на обычном ноутбуке
+          </h2>
+          <p className="mt-4 max-w-[60ch] text-muted">
+            Без видеокарты, без спутникового контракта, без выездов на поиск.
+            Снимки Sentinel и Landsat бесплатны и открыты, и это не льгота на
+            время конкурса — так устроены европейская и американская
+            программы наблюдения Земли.
+          </p>
+
+          <dl className="mt-9 grid gap-8 sm:grid-cols-3">
+            {[
+              ['406 км²', 'кольцо вокруг Астаны', 'четыре часа счёта'],
+              ['8 120 км²', 'пригороды 20 областных центров', 'восемьдесят часов'],
+              ['1 минута', 'проверить, сработает ли метод в области', 'до прогона, без снимков'],
+            ].map(([big, what, cost]) => (
+              <div key={String(big)}>
+                <dt className="tabular font-display text-[clamp(1.6rem,3vw,2.2rem)] leading-none text-violet-lit">
+                  {big}
+                </dt>
+                <dd className="mt-2 text-sm leading-snug text-line">{what}</dd>
+                <dd className="mt-0.5 text-xs leading-snug text-muted-2">{cost}</dd>
+              </div>
+            ))}
+          </dl>
+
+          <p className="mt-8 max-w-[60ch] text-sm leading-relaxed text-muted-2">
+            Последнее число важнее первых двух. Метод работает не везде: там,
+            где сельское хозяйство оставляет тот же след, что и свалка,
+            находки будут ложными. Мы умеем сказать это <strong className="font-normal text-line">до</strong> прогона,
+            за минуту и без единого снимка — и говорим, даже когда ответ
+            отрицательный.
+          </p>
+        </section>
+
         {/* ── Границы ───────────────────────────────────────────────── */}
         <section className="border-t border-grid pt-14 pb-20">
           <h2 className="max-w-[20ch] text-[clamp(1.7rem,3.6vw,2.6rem)] text-line">
