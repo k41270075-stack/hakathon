@@ -182,10 +182,16 @@ def css() -> str:
 
 
 def slides(n: dict) -> str:
-    shot = lambda name: (f'<div class="shot"><img src="{data_uri(SHOTS / name)}"></div>'
-                         if (SHOTS / name).exists() else "")
-    foot = lambda i, t: (f'<div class="foot"><span>Vantage AI · {t}</span>'
-                         f'<span>{i} / 12</span></div>')
+    def shot(name: str) -> str:
+        """Снимок с живого сайта. Отсутствует — слайд обходится без него."""
+        path = SHOTS / name
+        if not path.exists():
+            return ""
+        return f'<div class="shot"><img src="{data_uri(path)}"></div>'
+
+    def foot(index: int, title: str) -> str:
+        return (f'<div class="foot"><span>Vantage AI · {title}</span>'
+                f'<span>{index} / 12</span></div>')
 
     s = []
 
