@@ -38,6 +38,18 @@ from pathlib import Path
 MONTHS = ("январь", "февраль", "март", "апрель", "май", "июнь",
           "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь")
 
+#: Состав команды: имя и роль.
+#:
+#: Роль на слайде — это ещё и указание, кому адресовать вопрос на Q&A.
+#: Поэтому она названа так, как человек сам её назвал, а не обобщена до
+#: «разработчик»: спросят про модель — отвечает тот, кто её делал.
+TEAM = (
+    ("Нурбек", "продукт-лид, ИИ и машинное обучение"),
+    ("Каусар", "UI/UX-дизайн"),
+    ("Айдина", "исследование и дизайн"),
+    ("Алдияр", "фронтенд-разработка"),
+)
+
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
@@ -520,7 +532,15 @@ def slides(n: dict) -> str:
         </div>
         <div class="col">
           <div class="num mid">Команда</div>
-          <p class="note" style="margin-top:12px">[имена и роли]</p>
+          <div style="margin-top:16px">
+            {"".join(
+                f'<div style="display:flex;align-items:baseline;gap:12px;'
+                f'margin-bottom:9px">'
+                f'<span style="font-size:20px;color:var(--line);min-width:96px">{who}</span>'
+                f'<span style="font-size:16px;color:var(--muted2)">{role}</span>'
+                f'</div>'
+                for who, role in TEAM)}
+          </div>
           <p style="margin-top:22px"><b style="color:var(--line)">Репозиторий:</b>
             github.com/k41270075-stack/hakathon</p>
           <p style="margin-top:8px"><b style="color:var(--line)">Живой продукт:</b>
