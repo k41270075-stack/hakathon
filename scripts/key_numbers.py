@@ -28,6 +28,7 @@
     python scripts/key_numbers.py
 """
 
+import contextlib
 import json
 import sys
 from pathlib import Path
@@ -59,7 +60,6 @@ def plural(n: int, one: str, few: str, many: str) -> str:
 def main() -> int:
     import geopandas as gpd
     import pandas as pd
-    import yaml
     from shapely.geometry import box
 
     site = gpd.read_file(DATA / "candidates.geojson")
@@ -110,10 +110,10 @@ def main() -> int:
         folder = Path("outputs_real") if area == "astana" else Path(f"outputs_{area}")
         path = folder / "candidates.geojson"
         if path.exists():
-            try:
+            # Битая или недописанная выгрузка не должна ронять сборку
+            # страницы: она нужнее целой, чем точной до объекта.
+            with contextlib.suppress(Exception):
                 reviewed += len(gpd.read_file(path))
-            except Exception:
-                pass
 
     L = [
         "# Числа проекта",
@@ -177,7 +177,7 @@ def main() -> int:
         "|---|---:|",
         f"| Посчитано площади | **{ru(covered)} км²** |",
         f"| Областей посчитано | {counted} |",
-        f"| Из них дали настоящие свалки | 1 — северное кольцо |",
+        "| Из них дали настоящие свалки | 1 — северное кольцо |",
         f"| Ячеек в сетке риска | {ru(metrics.get('cells', 0))} |",
         "",
         "### По областям",
