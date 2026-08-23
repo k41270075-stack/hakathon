@@ -31,10 +31,10 @@ type Feature = GeoJSON.Feature<GeoJSON.Geometry, Props>;
  * месте. Поэтому он и красный, и в списке выезда стоит первым.
  */
 const REMOVAL: Record<string, { label: string; tone: string; dot: string }> = {
-  active: { label: 'активна', tone: 'text-muted', dot: '#a78bfa' },
-  possibly_removed: { label: 'вероятно устранена', tone: 'text-muted-2', dot: '#4c1d95' },
-  possibly_covered: { label: 'возможно засыпана', tone: 'text-line', dot: '#ede9fe' },
-  insufficient_data: { label: 'данных мало', tone: 'text-muted-2', dot: '#2f2450' },
+  active: { label: 'активна', tone: 'text-muted', dot: 'var(--color-violet-lit)' },
+  possibly_removed: { label: 'вероятно устранена', tone: 'text-muted-2', dot: 'var(--color-violet-deep)' },
+  possibly_covered: { label: 'возможно засыпана', tone: 'text-line', dot: 'var(--color-line)' },
+  insufficient_data: { label: 'данных мало', tone: 'text-muted-2', dot: 'var(--color-grid)' },
 };
 
 /* Ниже этого значения модель фактически возражает детектору. Показать
@@ -60,19 +60,19 @@ const VISUAL: Record<string, { short: string; full: string; tone: string; dot: s
     short: 'свалка',
     full: 'На снимке 0,4–0,8 м на пиксель видны признаки ссыпки: гребни от самосвалов, россыпь мусора, подъездные колеи.',
     tone: 'text-line',
-    dot: '#a78bfa',
+    dot: 'var(--color-violet-lit)',
   },
   not_landfill: {
     short: 'не свалка',
     full: 'На снимке это не свалка — постройка, промплощадка, стройка или водоём. Детектор нашёл здесь необратимое исчезновение растительности, и это правда: именно так выглядит любая застройка. Отсечь такое должен был контекстный фильтр по OpenStreetMap, но новая застройка вокруг Астаны в него не нанесена.',
     tone: 'text-amber',
-    dot: '#e3b341',
+    dot: 'var(--color-amber)',
   },
   unclear: {
     short: 'не разобрать',
     full: 'Снимка недостаточно: похоже на нарушенный грунт, но отличить свалку от отвала или заброшенной площадки по одному снимку нельзя. Нужен выезд.',
     tone: 'text-muted',
-    dot: '#8578ad',
+    dot: 'var(--color-muted-2)',
   },
 };
 
@@ -89,7 +89,7 @@ const GROUND = {
     + 'разметку по снимку: там, где съёмка показывает только нарушенный грунт, '
     + 'человек рядом видит, что именно лежит и возят ли туда до сих пор.',
   tone: 'text-emerald',
-  dot: '#3fb950',
+  dot: 'var(--color-emerald)',
 };
 
 const visualOf = (p: Props) => {
@@ -801,7 +801,7 @@ function ObjectCard({ f }: { f: Feature }) {
             <span
               aria-hidden="true"
               className="inline-block h-2 w-2 shrink-0 translate-y-[-1px] rounded-full"
-              style={{ background: '#3fb950' }}
+              style={{ background: 'var(--color-emerald)' }}
             />
             <span>
               {/* Дата приходит из GeoJSON меткой времени: «2026-08-23T00:00:00»
