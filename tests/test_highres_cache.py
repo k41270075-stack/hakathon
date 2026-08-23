@@ -70,3 +70,42 @@ class TestCacheKeyNamesAPlace:
         assert not offenders, (
             "кэш снимков снова именуется по номеру объекта: " + chr(10).join(offenders)
         )
+
+
+class TestPlaceholderDetection:
+    """Серый квадрат «съёмки нет» не должен доходить до листа просмотра.
+
+    Сетка 3x3 склеивается из девяти тайлов, и у поставщика может не быть
+    съёмки на части из них. Живая половина вытягивает общий разброс выше
+    порога, кадр принимается — а объект оказывается ровно под заглушкой.
+
+    Так на лист западной промзоны попал C00166 с надписью «Map data not
+    yet available» поперёк центра.
+    """
+
+    def _grid(self, core_flat: bool):
+        import numpy as np
+
+        rng = np.random.default_rng(0)
+        a = rng.integers(0, 255, (300, 300, 3)).astype("uint8")
+        if core_flat:
+            a[100:200, 100:200] = 200  # ровный серый в середине
+        return a
+
+    def test_fully_flat_frame_is_rejected(self):
+        import numpy as np
+
+        from review_sheets import looks_like_placeholder
+
+        assert looks_like_placeholder(np.full((300, 300, 3), 200, dtype="uint8"))
+
+    def test_frame_flat_only_in_the_middle_is_rejected(self):
+        """Тот самый случай: края живые, объект под заглушкой."""
+        from review_sheets import looks_like_placeholder
+
+        assert looks_like_placeholder(self._grid(core_flat=True))
+
+    def test_real_frame_passes(self):
+        from review_sheets import looks_like_placeholder
+
+        assert not looks_like_placeholder(self._grid(core_flat=False))
