@@ -166,6 +166,13 @@ const num = (v: unknown, d = 0) => {
 const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
   'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
 
+/** «23 августа 2026» — для даты выезда: она про день, а не про месяц. */
+function humanDay(v: unknown) {
+  const d = new Date(String(v));
+  if (Number.isNaN(d.getTime())) return typeof v === 'string' ? v.slice(0, 10) : '';
+  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
+
 function humanDate(v: unknown) {
   const d = new Date(String(v));
   return Number.isNaN(d.getTime()) ? '—' : `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
@@ -734,6 +741,17 @@ function ObjectCard({ f }: { f: Feature }) {
           ['Площадь', `${num(p.area_m2)} м²`],
           ['Масса', `${num(p.mass_t)} т`],
           ['Метан за 20 лет', `${num(p.co2e_t)} т CO₂-экв.`],
+          /* Уже ушедшее — отдельной строкой от прогнозного.
+             Разложение по IPCC идёт от даты возникновения, и у объекта
+             2019 года половина метана уже в атмосфере. Показывать только
+             полный горизонт значит утверждать, что всё ещё впереди. */
+          ...(Number(p.co2e_emitted_t) > 0 && Number(p.co2e_t) > 0
+            ? ([[
+                'Из них уже выброшено',
+                `${num(p.co2e_emitted_t)} т — `
+                + `${Math.round((Number(p.co2e_emitted_t) / Number(p.co2e_t)) * 100)}%`,
+              ]] as [string, string][])
+            : []),
         ].map(([k, v]) => (
           <div key={k}>
             <dt className="text-xs text-muted-2">{k}</dt>
@@ -772,6 +790,28 @@ function ObjectCard({ f }: { f: Feature }) {
       <p className="tabular mt-1 text-xs text-muted-2">
         P10 {kzt(p.damage_p10)} · P90 {kzt(p.damage_p90)}
       </p>
+
+      {/* Кто был на месте и когда. Раньше это жило только в подсказке к
+          подписи — то есть пропадало и на печати акта, и на скриншоте, а
+          именно этим объект и отличается от находки по снимку. */}
+      {p.check_source === 'ground' && (p.ground_by || p.ground_date) ? (
+        <>
+          <h3 className="mt-6 text-sm text-muted-2">Проверено на месте</h3>
+          <p className="mt-1 flex items-baseline gap-2 text-line">
+            <span
+              aria-hidden="true"
+              className="inline-block h-2 w-2 shrink-0 translate-y-[-1px] rounded-full"
+              style={{ background: '#3fb950' }}
+            />
+            <span>
+              {/* Дата приходит из GeoJSON меткой времени: «2026-08-23T00:00:00»
+                  в карточке читается как ошибка выгрузки. */}
+              {[p.ground_by, humanDay(p.ground_date)].filter(Boolean).join(', ')}
+              {p.ground_evidence ? ` — ${p.ground_evidence}` : ''}
+            </span>
+          </p>
+        </>
+      ) : null}
 
       {removalOf(p) && (
         <>
