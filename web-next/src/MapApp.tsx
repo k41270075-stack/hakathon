@@ -173,14 +173,18 @@ function humanDate(v: unknown) {
 
 type SortKey = 'visual' | 'probability' | 'evidence_score' | 'damage_p50' | 'area_m2' | 'break_date' | 'risk_of_cover';
 
+/* Подписи короткие намеренно. Список стоит в колонке шириной 22rem, и
+   «сначала опознанные как свалка» обрезалось на «как свал» — выбранный
+   пункт переставал читаться, то есть переключатель не показывал своё
+   же состояние. */
 const SORTS: [SortKey, string][] = [
-  ['visual', 'сначала опознанные как свалка'],
-  ['risk_of_cover', 'сначала подозрение на присыпку'],
-  ['probability', 'по вероятности модели'],
+  ['visual', 'сначала свалки'],
+  ['risk_of_cover', 'сначала присыпка'],
+  ['probability', 'по оценке модели'],
   ['evidence_score', 'по согласию признаков'],
   ['damage_p50', 'по ущербу'],
   ['area_m2', 'по площади'],
-  ['break_date', 'по дате возникновения'],
+  ['break_date', 'по дате'],
 ];
 
 export default function MapApp() {
