@@ -132,7 +132,7 @@ OSM, и работает он настолько, насколько подро�
 ```bash
 python -m pytest tests/ -q          # 667 проверок; часть сверяет сайт с данными
 cd web-next && npm run build && cd ..
-python scripts/smoke.py             # шесть страниц открываются без ошибок
+python scripts/smoke.py             # шесть страниц + карта без интернета
 python scripts/mobile_check.py      # перелив вбок и глубина карты на 360/390/768
 python scripts/key_numbers.py       # пересобрать docs/NUMBERS.md
 python scripts/deck_assets.py       # переснять картинки для деки
