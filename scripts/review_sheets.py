@@ -87,12 +87,18 @@ def picture(lat: float, lon: float, name: str, cfg, refresh: bool = False):
 
     from vantage.verify import PROVIDERS, fetch_tile_grid
 
+    from highres_cache import cache_name
+
     CACHE.mkdir(parents=True, exist_ok=True)
-    # Зум в имени файла: см. тот же комментарий в eval_on_ours.py. Здесь
-    # зум ещё и подбирается лесенкой, так что без него в ключе кэш вообще
-    # не говорит, что в нём лежит.
+    # Ключ кэша — место и зум, а не номер объекта: см. scripts/highres_cache.py.
+    # Здесь зум ещё и подбирается лесенкой, так что без него в ключе кэш
+    # вообще не говорит, что в нём лежит.
     for zoom in ZOOM_LADDER:
-        path = CACHE / f"{name}_z{zoom}.png"
+        legacy = CACHE / f"{name}_z{zoom}.png"
+        if legacy.exists():
+            legacy.unlink()
+    for zoom in ZOOM_LADDER:
+        path = CACHE / cache_name(lat, lon, zoom)
         if path.exists() and not refresh:
             return Image.open(path).convert("RGB")
 
@@ -109,7 +115,7 @@ def picture(lat: float, lon: float, name: str, cfg, refresh: bool = False):
             if looks_like_placeholder(grid):
                 continue
             image = Image.fromarray(grid.astype("uint8"))
-            image.save(CACHE / f"{name}_z{zoom}.png")
+            image.save(CACHE / cache_name(lat, lon, zoom))
             return image
     return None
 
