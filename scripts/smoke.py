@@ -102,10 +102,11 @@ def main() -> int:
 
                 errors: list[str] = []
                 failures: list[str] = []
-                page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
-                page.on("pageerror", lambda e: errors.append(f"исключение: {e}"))
-                page.on("requestfailed", lambda r: (
-                    failures.append(f"{r.url[:90]} — {r.failure}")
+                page.on("console",
+                        lambda m, sink=errors: sink.append(m.text) if m.type == "error" else None)
+                page.on("pageerror", lambda e, sink=errors: sink.append(f"исключение: {e}"))
+                page.on("requestfailed", lambda r, sink=failures: (
+                    sink.append(f"{r.url[:90]} — {r.failure}")
                     if not any(host in r.url for host in FOREIGN)
                     and "ERR_ABORTED" not in (r.failure or "") else None
                 ))
