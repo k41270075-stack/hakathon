@@ -314,6 +314,7 @@ docs/
   NUMBERS.md               все числа проекта в одной таблице
   PITCH.md                 питч на семь минут и сценарий живой демонстрации
   QA.md                    тридцать вопросов жюри и ответы на них
+  PILOT.md                 путь от демонстрации до эксплуатации: восемь недель
   examples/                образцы акта: черновик и подтверждённый
 ```
 
@@ -350,7 +351,8 @@ docs/
 
 Устройство системы целиком — [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md),
 все числа одной таблицей — [docs/NUMBERS.md](docs/NUMBERS.md),
-разбор защиты — [docs/PITCH.md](docs/PITCH.md) и [docs/QA.md](docs/QA.md).
+разбор защиты — [docs/PITCH.md](docs/PITCH.md) и [docs/QA.md](docs/QA.md),
+что нужно, чтобы это заработало у заказчика, — [docs/PILOT.md](docs/PILOT.md).
 
 ---
 
