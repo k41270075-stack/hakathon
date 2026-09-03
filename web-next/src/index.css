@@ -266,6 +266,32 @@ p { text-wrap: pretty; }
   filter: invert(1) hue-rotate(180deg) brightness(0.8) contrast(0.95) saturate(0.28);
 }
 
+/* Подсветка блока, на который показывает проводка по сценарию.
+
+   Обводкой, а не заливкой: заливка перекрасила бы числа, а числа здесь и
+   есть то, ради чего на блок смотрят. Затухает сама — постоянная рамка
+   через полминуты перестаёт читаться как указатель и начинает читаться
+   как часть вёрстки.
+
+   outline, а не border: border сдвинул бы содержимое на два пикселя, и
+   карточка дёргалась бы на каждом шаге. */
+@keyframes tour-lit {
+  0%   { outline-color: color-mix(in srgb, var(--color-violet-lit) 90%, transparent); }
+  70%  { outline-color: color-mix(in srgb, var(--color-violet-lit) 70%, transparent); }
+  100% { outline-color: transparent; }
+}
+.tour-lit {
+  outline: 2px solid transparent;
+  outline-offset: 4px;
+  border-radius: 2px;
+  animation: tour-lit 1.4s ease-out forwards;
+}
+
+/* Уважаем системную настройку: мигание — ровно то, что просят выключить. */
+@media (prefers-reduced-motion: reduce) {
+  .tour-lit { animation-duration: 0.01ms; outline-color: transparent; }
+}
+
 /* Тепловая поверхность лежит под маркерами: это контекст, а не объекты,
    по которым кликают. */
 .vantage-heat {

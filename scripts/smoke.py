@@ -159,33 +159,43 @@ def main() -> int:
                       wait_until="networkidle", timeout=60_000)
             page.wait_for_timeout(2500)
 
+            # Проверка проходит сценарий целиком, а не только открывает
+            # ссылку. Раньше здесь стояло «href содержит object=» плюс
+            # поиск пяти слов в теле страницы — и это проходило бы, даже
+            # если бы шаги 3–6 никуда не вели: слова лежат в карточке
+            # независимо от того, доводит ли до них продукт. Лендинг
+            # обещает шесть шагов, значит проверять надо шесть переходов.
             steps: list[tuple[str, bool]] = []
             link = page.locator("#scenario a", has_text="Пройти сценарий")
             href = link.get_attribute("href") if link.count() else None
-            steps.append(("ссылка сценария", bool(href and "object=" in href)))
+            steps.append(("ссылка сценария", bool(href and "tour=" in href)))
 
             if href:
                 page.goto(f"http://127.0.0.1:{PORT}/{href.lstrip('./')}",
                           wait_until="networkidle", timeout=60_000)
                 page.wait_for_timeout(4000)
-                # Прямая ссылка обязана открыть карточку сама: если она
-                # молча откроет карту без выбора, выступающий будет искать
-                # строку руками и потеряет полминуты.
-                opened = page.locator("aside h2").first
-                wanted = href.split("object=")[-1]
-                steps.append(("объект открыт ссылкой",
-                              opened.count() > 0 and wanted in opened.inner_text()))
-                # inner_text отдаёт ОТРИСОВАННЫЙ текст: подпись
-                # «рекомендуем» набрана строчными, а показывается
-                # прописными из-за text-transform. Сверять надо в одном
-                # регистре, иначе проверка падает на верной странице.
-                body = page.inner_text("body").lower()
-                for name, phrase in (("доказательства", "признаки"),
-                                     ("деньги", "вывоз и захоронение"),
-                                     ("рекомендация", "что выгоднее сделать"),
-                                     ("выбор назван", "рекомендуем"),
-                                     ("действие", "черновик акта")):
-                    steps.append((name, phrase in body))
+                steps.append(("проводка запустилась",
+                              page.get_by_role("group", name="Сценарий").count() > 0))
+
+                # Слово, которое обязано быть на экране на этом шаге.
+                # inner_text отдаёт ОТРИСОВАННЫЙ текст: и номер шага, и
+                # подпись «рекомендуем» показываются прописными из-за
+                # text-transform, поэтому сверка идёт в нижнем регистре.
+                WALK = (
+                    ("шаг 1 — очередь по деньгам", "с чего начать"),
+                    ("шаг 2 — карточка объекта", "проверено человеком"),
+                    ("шаг 3 — доказательства", "признаки"),
+                    ("шаг 4 — деньги", "вывоз и захоронение"),
+                    ("шаг 5 — рекомендация", "рекомендуем"),
+                    ("шаг 6 — действие", "черновик акта"),
+                )
+                for i, (name, phrase) in enumerate(WALK):
+                    if i:
+                        # Пробел — то, что шлёт кликер выступающего.
+                        page.keyboard.press(" ")
+                        page.wait_for_timeout(1200)
+                    body = page.inner_text("body").lower()
+                    steps.append((name, f"шаг {i + 1} из 6" in body and phrase in body))
 
             broken = [name for name, ok in steps if not ok]
             mark = "OK  " if not broken else "!!  "

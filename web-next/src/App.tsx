@@ -519,15 +519,15 @@ export default function App() {
                 </p>
                 {money.priority[0]?.id && (
                   <a
-                    href={`./map.html?object=${money.priority[0].id}`}
+                    href="./map.html?tour=1"
                     className="mt-6 inline-block rounded-sm bg-violet px-5 py-3 font-display text-sm font-semibold uppercase tracking-[0.12em] text-paper no-underline transition-colors duration-200 hover:bg-violet-lit hover:text-soot"
                   >
                     Пройти сценарий →
                   </a>
                 )}
                 <p className="mt-3 max-w-[44ch] text-xs leading-snug text-muted-2">
-                  Ссылка открывает карту сразу на самом дорогом объекте
-                  области.
+                  Откроется карта и проведёт по всем шести шагам. Пробел
+                  или стрелки — дальше.
                 </p>
               </div>
 

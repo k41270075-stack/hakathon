@@ -37,6 +37,61 @@ const REMOVAL: Record<string, { label: string; tone: string; dot: string }> = {
   insufficient_data: { label: 'данных мало', tone: 'text-muted-2', dot: 'var(--color-grid)' },
 };
 
+/* Сценарий за минуту — шесть шагов, которые лендинг обещает списком.
+ *
+ * Обещание там было, а исполнения не было: кнопка «Пройти сценарий»
+ * открывала карту на нужном объекте и на этом заканчивалась. Шаги 1 и 2
+ * из шести, а остальные четыре выступающий должен был отыграть руками,
+ * прокручивая карточку и называя блоки вслух. На репетиции это работает,
+ * на седьмой минуте питча — нет.
+ *
+ * Теперь ссылка ведёт проводку. Каждый шаг сам ставит карту в нужное
+ * состояние: выбирает объект, докручивает карточку до нужного блока и
+ * подсвечивает его. Выступающий жмёт пробел или стрелку и говорит.
+ *
+ * Порядок и подписи повторяют лендинг дословно. Две разные версии одного
+ * сценария — на странице и в продукте — расходятся в первый же правок, и
+ * расхождение это заметят ровно на защите.
+ */
+const TOUR: { title: string; note: string; anchor: string | null; pick: boolean }[] = [
+  {
+    title: 'Открыл карту',
+    note: 'Очередь по деньгам, а не список точек.',
+    anchor: 'start',
+    pick: false,
+  },
+  {
+    title: 'Взял верхний объект',
+    note: 'Самый дорогой в области. Карта улетела на него.',
+    anchor: null,
+    pick: true,
+  },
+  {
+    title: 'Увидел доказательства',
+    note: 'Вердикт человека, оценка модели и пять признаков с весами.',
+    anchor: 'signals',
+    pick: true,
+  },
+  {
+    title: 'Увидел деньги',
+    note: 'Вывоз, возврат вторсырьём, климат — и интервал P10–P90.',
+    anchor: 'money',
+    pick: true,
+  },
+  {
+    title: 'Получил рекомендацию',
+    note: 'Вывезти как есть или разобрать на площадке — и на сколько это выгоднее.',
+    anchor: 'advice',
+    pick: true,
+  },
+  {
+    title: 'Сформировал действие',
+    note: 'Черновик акта одной кнопкой и контроль устранения через месяц.',
+    anchor: 'act',
+    pick: true,
+  },
+];
+
 /* Срочность выезда — деньгами, а не размером.
  *
  * Список отсортирован по ущербу, но отсортированный столбец отвечает на
@@ -440,10 +495,71 @@ export default function MapApp() {
    * Срабатывает один раз и только если объект в выгрузке есть: ссылка на
    * снятый объект должна открыть карту как обычно, а не пустую карточку
    * с чужим номером. */
+  /* Шаг сценария; null — проводки нет. Отдельно от выбранного объекта:
+     объект остаётся выбранным все шаги со второго по шестой, а шаг
+     меняется на каждом нажатии. */
+  const [tour, setTour] = useState<number | null>(null);
+
+  /* Объект, по которому идёт рассказ, — верхний по деньгам. Берётся из
+     тех же данных, что панель «С чего начать», а не вписан в ссылку:
+     ссылка с номером объекта живёт до первого пересчёта, после которого
+     самым дорогим станет другой, а вести будет на прежний. */
+  const tourTarget = start[0] ?? rows[0] ?? null;
+
+  useEffect(() => {
+    if (tour === null || !rows.length) return;
+    const step = TOUR[tour];
+    const id = tourTarget ? String(tourTarget.properties.candidate_id) : null;
+
+    /* Выбор объекта — вся работа второго шага. Полёт карты делать не
+       надо: MapView летит к выделенному сам, и второй вызов дал бы
+       двойную анимацию. */
+    if (step.pick && id) setSelected(id);
+    if (!step.pick) setSelected(null);
+
+    if (!step.anchor) return;
+    /* Карточка монтируется этим же рендером, и якоря в DOM ещё нет.
+       Кадр ожидания дешевле, чем слой рефов через три компонента. */
+    const timer = window.setTimeout(() => {
+      const node = document.querySelector<HTMLElement>(`[data-tour="${step.anchor}"]`);
+      if (!node) return;
+      node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      // Перезапуск анимации: без снятия класса и принудительной
+      // перекомпоновки повторный вход на тот же шаг не мигнёт.
+      node.classList.remove('tour-lit');
+      void node.offsetWidth;
+      node.classList.add('tour-lit');
+      window.setTimeout(() => node.classList.remove('tour-lit'), 1400);
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [tour, tourTarget, rows.length]);
+
+  /* Клавиши. Выступают с кликером, а он шлёт стрелки и пробел — это и
+     есть главный способ листать шаги, мышь второй. */
+  useEffect(() => {
+    if (tour === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setTour(null); return; }
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+        e.preventDefault();
+        setTour((n) => (n === null ? null : Math.min(TOUR.length - 1, n + 1)));
+      }
+      if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault();
+        setTour((n) => (n === null ? null : Math.max(0, n - 1)));
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [tour]);
+
   const deepLinked = useRef(false);
   useEffect(() => {
     if (deepLinked.current || !rows.length) return;
-    const wanted = new URLSearchParams(window.location.search).get('object');
+    const params = new URLSearchParams(window.location.search);
+    // ?tour=1 — проводка по сценарию. Объект она выбирает сама.
+    if (params.has('tour')) { deepLinked.current = true; setTour(0); return; }
+    const wanted = params.get('object');
     if (!wanted) { deepLinked.current = true; return; }
     const row = rows.find((f) => String(f.properties.candidate_id) === wanted);
     if (!row) { deepLinked.current = true; return; }
@@ -767,7 +883,7 @@ export default function MapApp() {
                рекомендацией не являются — «начните с четырёх, они держат
                половину денег» является. Строки кликаются: рассказ
                продолжается там же, где начался. */
-            <div className="px-5 py-6">
+            <div className="px-5 py-6" data-tour="start">
               <h2 className="text-xl text-line">С чего начать</h2>
               {start.length > 0 ? (
                 <>
@@ -846,6 +962,108 @@ export default function MapApp() {
             <ObjectCard f={current} split={money.get(String(current.properties?.candidate_id))} />
           )}
         </aside>
+      </div>
+
+      {tour !== null && (
+        <TourBar
+          step={tour}
+          onStep={setTour}
+          onClose={() => setTour(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* Панель проводки.
+ *
+ * Стоит снизу по центру и намеренно узкая: она комментирует то, что
+ * происходит на экране, а не заменяет собой экран. Затемнения поверх
+ * страницы нет — на защите смотрят продукт, а не обучающий слой поверх
+ * него, и первое же затемнение превращает демонстрацию в справку.
+ *
+ * z-index выше тысячи: элементы управления Leaflet живут до 1000, и
+ * панель, попавшая под кнопки масштаба, читалась бы как ошибка вёрстки.
+ */
+function TourBar({ step, onStep, onClose }: {
+  step: number;
+  onStep: (n: number) => void;
+  onClose: () => void;
+}) {
+  const s = TOUR[step];
+  const last = step === TOUR.length - 1;
+
+  return (
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-[1200] flex justify-center px-3 pb-3">
+      <div
+        role="group"
+        aria-label={`Сценарий, шаг ${step + 1} из ${TOUR.length}`}
+        className="pointer-events-auto w-full max-w-[46rem] rounded-md border border-grid bg-soot-2/95 px-4 py-3 shadow-[0_18px_48px_-24px_rgba(0,0,0,0.9)] backdrop-blur-sm"
+      >
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span className="tabular font-display text-[11px] uppercase tracking-[0.14em] text-violet-lit">
+            Шаг {step + 1} из {TOUR.length}
+          </span>
+          <span className="text-base text-line">{s.title}</span>
+          <span className="text-xs text-muted-2">{s.note}</span>
+        </div>
+
+        <div className="mt-2.5 flex items-center gap-2">
+          {/* Точки шагов кликаются: если на вопрос из зала надо вернуться
+              к деньгам, листать назад по одному — потерянные секунды. */}
+          <div className="flex flex-1 items-center gap-1.5">
+            {TOUR.map((t, i) => (
+              <button
+                key={t.title}
+                type="button"
+                aria-label={`Шаг ${i + 1}: ${t.title}`}
+                aria-current={i === step}
+                onClick={() => onStep(i)}
+                className={`h-1.5 flex-1 cursor-pointer rounded-full transition-colors duration-150 ${
+                  i <= step ? 'bg-violet-lit' : 'bg-grid hover:bg-violet-deep'
+                }`}
+              />
+            ))}
+          </div>
+
+          <button
+            type="button"
+            onClick={() => onStep(Math.max(0, step - 1))}
+            disabled={step === 0}
+            className="cursor-pointer rounded-sm border border-grid px-2.5 py-1 text-xs text-muted transition-colors duration-150 hover:border-violet hover:text-line disabled:cursor-default disabled:opacity-35 disabled:hover:border-grid disabled:hover:text-muted"
+          >
+            ←
+          </button>
+          {last ? (
+            <button
+              type="button"
+              onClick={onClose}
+              className="cursor-pointer rounded-sm border border-grid px-3 py-1 text-xs text-muted transition-colors duration-150 hover:border-violet hover:text-line"
+            >
+              Готово
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onStep(step + 1)}
+              className="cursor-pointer rounded-sm bg-violet px-3 py-1 font-display text-xs font-semibold uppercase tracking-[0.1em] text-paper transition-colors duration-150 hover:bg-violet-lit hover:text-soot"
+            >
+              Дальше →
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Закрыть сценарий"
+            className="cursor-pointer px-1.5 text-sm text-muted-2 transition-colors duration-150 hover:text-line"
+          >
+            ✕
+          </button>
+        </div>
+
+        <p className="mt-1.5 text-[11px] text-muted-2">
+          Пробел или → — дальше, ← — назад, Esc — выйти.
+        </p>
       </div>
     </div>
   );
@@ -1012,7 +1230,7 @@ function ObjectCard({ f, split }: { f: Feature; split?: Split }) {
         ))}
       </dl>
 
-      <h3 className="mt-5 text-sm text-muted-2">Признаки</h3>
+      <h3 className="mt-5 text-sm text-muted-2" data-tour="signals">Признаки</h3>
       <ul className="mt-2 space-y-2.5">
         {SIGNALS.map(([key, label, full]) => {
           const raw = Number(p[key]);
@@ -1042,7 +1260,7 @@ function ObjectCard({ f, split }: { f: Feature; split?: Split }) {
           пометки не было, они выглядели одинаково: «3 327 м²» и
           «8,3 млн ₸» стояли рядом одним кеглем, и первый же вопрос «а эти
           миллионы вы измеряли?» бил по обеим. */}
-      <div className="mt-6 flex items-baseline justify-between gap-3">
+      <div className="mt-6 flex items-baseline justify-between gap-3" data-tour="money">
         <h3 className="text-sm text-muted-2">Ущерб</h3>
         <span className="rounded-full border border-amber/40 px-2 py-0.5 text-[10px] uppercase tracking-[0.08em] text-amber">
           модельная оценка
@@ -1093,7 +1311,7 @@ function ObjectCard({ f, split }: { f: Feature; split?: Split }) {
        * чтобы проверить рекомендацию, — и его же мы просим на пилоте. */}
       {split && (
         <>
-          <h3 className="mt-7 text-sm text-muted-2">Что выгоднее сделать</h3>
+          <h3 className="mt-7 text-sm text-muted-2" data-tour="advice">Что выгоднее сделать</h3>
           <dl className="mt-2 overflow-hidden rounded-sm border border-grid">
             <div className="flex items-baseline justify-between gap-3 border-b border-grid px-3 py-2.5">
               <dt className="text-sm text-muted">Вывезти как есть</dt>
@@ -1177,6 +1395,7 @@ function ObjectCard({ f, split }: { f: Feature; split?: Split }) {
 
       <button
         type="button"
+        data-tour="act"
         onClick={() => window.print()}
         className="mt-7 w-full cursor-pointer rounded-sm bg-violet px-4 py-3 font-display text-sm font-semibold uppercase tracking-[0.12em] text-paper transition-colors duration-200 hover:bg-violet-lit hover:text-soot"
       >
