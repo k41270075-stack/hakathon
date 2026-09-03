@@ -37,6 +37,39 @@ const REMOVAL: Record<string, { label: string; tone: string; dot: string }> = {
   insufficient_data: { label: 'данных мало', tone: 'text-muted-2', dot: 'var(--color-grid)' },
 };
 
+/* Срочность выезда — деньгами, а не размером.
+ *
+ * Список отсортирован по ущербу, но отсортированный столбец отвечает на
+ * вопрос «что дороже», а не «с чего начинать». Разница видна на числах:
+ * первые четыре объекта держат половину всей суммы, следующие пять —
+ * ещё треть, а нижняя половина списка вместе стоит меньше одного
+ * верхнего. Глазами по колонке «млн ₸» это не читается: 8,3 и 2,0 —
+ * числа одного порядка, и строка внизу выглядит такой же, как строка
+ * вверху.
+ *
+ * Поэтому ступень считается по накопленной доле ущерба, а не по порогу в
+ * тенге: порог пришлось бы переписывать при каждой новой области, а доля
+ * верна в любой. Красные — объекты, дающие первую половину суммы;
+ * оранжевые — те, что доводят её до 80%; жёлтые — весь хвост.
+ */
+const URGENCY: Record<string, { label: string; dot: string; full: string }> = {
+  hi: {
+    label: 'срочно',
+    dot: 'var(--color-urgent-hi)',
+    full: 'Первая половина всей суммы ущерба по области лежит на этих объектах. Выезд начинается отсюда.',
+  },
+  mid: {
+    label: 'средне',
+    dot: 'var(--color-urgent-mid)',
+    full: 'Объекты, которые доводят накопленный ущерб до 80% суммы. Едут после красных.',
+  },
+  low: {
+    label: 'малый',
+    dot: 'var(--color-urgent-low)',
+    full: 'Хвост списка: вместе эти объекты стоят пятую часть суммы. Убирать попутно.',
+  },
+};
+
 /* Проверка глазами по снимку 0,6 м на пиксель.
  *
  * Это сильнее любой модели, и не из-за качества модели. Модель обучена на
@@ -76,10 +109,10 @@ const VISUAL: Record<string, { short: string; full: string; tone: string; dot: s
  * на защите спросят именно «кто смотрел», и ответ должен быть на экране, а
  * не в памяти выступающего. */
 const GROUND = {
-  short: 'проверено',
-  full: 'Подтверждено человеком на месте, а не по снимку. Выезд перебивает '
-    + 'разметку по снимку: там, где съёмка показывает только нарушенный грунт, '
-    + 'человек рядом видит, что именно лежит и возят ли туда до сих пор.',
+  short: 'подтверждено',
+  full: 'Подтверждено человеком, а не моделью. Там, где съёмка показывает '
+    + 'только нарушенный грунт, человек видит, что именно лежит и возят ли '
+    + 'туда до сих пор.',
   tone: 'text-emerald',
   dot: 'var(--color-emerald)',
 };
@@ -338,6 +371,33 @@ export default function MapApp() {
     return half.slice(0, 5);
   }, [candidates]);
 
+  /* Ступень срочности по каждому объекту.
+     Считается один раз на весь набор и не зависит от выбранной
+     сортировки: срочность — свойство объекта, а не порядка строк. Иначе
+     один и тот же объект менял бы цвет при переключении сортировки, и
+     цвет перестал бы что-либо значить.
+     Объекты, опознанные человеком как «не свалка», в расчёт не входят и
+     точки не получают: их не поедут убирать, и место в очереди на выезд
+     им не положено. */
+  const urgency = useMemo(() => {
+    const list = ((candidates?.features ?? []) as Feature[])
+      .filter((f) => f.properties?.visual_check !== 'not_landfill')
+      .sort((a, b) => (Number(b.properties?.damage_p50) || 0) - (Number(a.properties?.damage_p50) || 0));
+    const total = list.reduce((s, f) => s + (Number(f.properties?.damage_p50) || 0), 0);
+    const step = new Map<string, keyof typeof URGENCY>();
+    if (!total) return step;
+    let running = 0;
+    for (const f of list) {
+      /* Доля считается по накопленному ДО объекта, а не после: иначе
+         единственный объект, держащий сразу 60% суммы, сам себя
+         выталкивал бы за порог половины и оказывался оранжевым. */
+      const share = running / total;
+      running += Number(f.properties?.damage_p50) || 0;
+      step.set(String(f.properties?.candidate_id), share < 0.5 ? 'hi' : share < 0.8 ? 'mid' : 'low');
+    }
+    return step;
+  }, [candidates]);
+
   const rows = useMemo(() => {
     const list = [...(candidates?.features ?? [])] as Feature[];
     list.sort((a, b) => {
@@ -471,14 +531,37 @@ export default function MapApp() {
               стоит дешевле, чем объяснение на защите. */}
           <div className="flex shrink-0 items-baseline justify-between gap-3 border-b border-grid px-4 py-1.5 text-[11px] uppercase tracking-[0.1em] text-muted-2">
             <span>Объект</span>
-            {/* Заголовок столбца называет источник проверки, а не один из
-                возможных. Пока все объекты подтверждены выездом, «по
-                снимку» было бы неправдой; когда появятся новые, не
-                проверенные ногами, — станет неправдой обратное. */}
-            <span title="Кто и как проверил объект: выезд на место или снимок 0,4–0,8 м на пиксель">
-              {totals.ground === totals.count ? 'Проверено на месте' : 'Как проверено'}
+            {/* Одно слово, а не две формулировки под условием.
+                Раньше заголовок переключался между «проверено на месте» и
+                «как проверено» в зависимости от того, все ли объекты
+                объехали. Обе версии обещали больше, чем стоит обещать
+                вслух: подтверждение — факт, а чем именно оно получено,
+                написано в карточке объекта, где это можно прочесть
+                целиком, а не угадать по заголовку столбца. */}
+            <span title="Как подтверждён объект — написано в его карточке">
+              Подтверждено
             </span>
           </div>
+
+          {/* Легенда шкалы стоит здесь, а не в подсказке при наведении.
+              Цветную точку без подписи каждый читает по-своему, а на
+              показе спросят сразу и вслух. Строка стоит 22 пикселя —
+              дешевле любого объяснения голосом. */}
+          {urgency.size > 0 && (
+            <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-grid px-4 py-1.5 text-[11px] text-muted-2">
+              <span className="uppercase tracking-[0.1em]">Срочность</span>
+              {(['hi', 'mid', 'low'] as const).map((k) => (
+                <span key={k} className="flex items-center gap-1.5" title={URGENCY[k].full}>
+                  <span
+                    aria-hidden="true"
+                    className="inline-block h-2 w-2 rounded-full"
+                    style={{ background: URGENCY[k].dot }}
+                  />
+                  {URGENCY[k].label}
+                </span>
+              ))}
+            </div>
+          )}
 
           <ol className="min-h-0 flex-1 overflow-y-auto">
             {rows.map((f) => {
@@ -567,6 +650,19 @@ export default function MapApp() {
                     </div>
                     <div className="mt-0.5 flex flex-wrap items-baseline gap-x-4 text-xs text-muted-2">
                       <span className="tabular">признаков {agreeing} из 5</span>
+                      {urgency.get(id) && (
+                        <span
+                          className="flex items-center gap-1.5"
+                          title={URGENCY[urgency.get(id)!].full}
+                        >
+                          <span
+                            aria-hidden="true"
+                            className="inline-block h-2 w-2 rounded-full"
+                            style={{ background: URGENCY[urgency.get(id)!].dot }}
+                          />
+                          {URGENCY[urgency.get(id)!].label}
+                        </span>
+                      )}
                       {removalOf(p) && (
                         <span className="flex items-center gap-1.5">
                           <span
@@ -708,7 +804,7 @@ export default function MapApp() {
                                 {num(p.area_m2)} м² · {humanDate(p.break_date)}
                               </span>
                               {p.check_source === 'ground' && (
-                                <span className="text-emerald">проверен на месте</span>
+                                <span className="text-emerald">подтверждён</span>
                               )}
                             </span>
                           </button>
@@ -727,8 +823,8 @@ export default function MapApp() {
 
               <p className="mt-6 max-w-[34ch] text-xs leading-relaxed text-muted-2">
                 {/* Текст считается из данных: сколько объектов и сколько
-                    подтверждено на месте. Вписанное руками разошлось бы с
-                    карточками при первом же новом выезде. */}
+                    подтверждено. Вписанное руками разошлось бы с карточками
+                    при первом же новом выезде. */}
                 В реестре слева {totals.count}{' '}
                 {plural(totals.count, 'объект', 'объекта', 'объектов')}
                 {raw ? `, отобранных из ${raw}` : ''}.
@@ -739,8 +835,7 @@ export default function MapApp() {
                     <span className="text-emerald">
                       {totals.ground}{' '}
                       {plural(totals.ground, 'подтверждён', 'подтверждены', 'подтверждены')}
-                    </span>{' '}
-                    выездом на место
+                    </span>
                   </>
                 )}
                 . Находки, оказавшиеся складами, промплощадками и болотами, в
@@ -829,7 +924,7 @@ function ObjectCard({ f, split }: { f: Feature; split?: Split }) {
                 выездом, «проверено по снимку» — прямая неправда, а
                 источник проверки здесь и есть главное. */}
             <span className="text-xs text-muted-2">
-              {p.check_source === 'ground' ? 'Проверено на месте' : 'Проверено по снимку'}
+              {p.check_source === 'ground' ? 'Проверено человеком' : 'Проверено по снимку'}
             </span>
             <span className={`flex items-center gap-1.5 text-sm ${visualOf(p)!.tone}`}>
               <span
@@ -1042,7 +1137,7 @@ function ObjectCard({ f, split }: { f: Feature; split?: Split }) {
           именно этим объект и отличается от находки по снимку. */}
       {p.check_source === 'ground' && (p.ground_by || p.ground_date) ? (
         <>
-          <h3 className="mt-6 text-sm text-muted-2">Проверено на месте</h3>
+          <h3 className="mt-6 text-sm text-muted-2">Кто подтвердил</h3>
           <p className="mt-1 flex items-baseline gap-2 text-line">
             <span
               aria-hidden="true"
