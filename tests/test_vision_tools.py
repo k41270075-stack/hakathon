@@ -68,3 +68,23 @@ def test_ai_answers_never_enter_human_labels():
     assert all(a["reviewer"] == "claude-vision" for a in answers.values())
     labels = (ROOT / "labels_manual.geojson").read_text(encoding="utf-8")
     assert "claude-vision" not in labels
+
+
+def test_gov_registry_distance_is_written_per_object(tmp_path, monkeypatch):
+    """Объект у полигона госмониторинга — 0 м, далёкий — километры."""
+    import geopandas as gpd
+    from shapely.geometry import Point
+
+    gov_waste = _load("gov_waste")
+    site_path = tmp_path / "candidates.geojson"
+    site = gpd.GeoDataFrame({"candidate_id": ["A", "B"]},
+                            geometry=[Point(71.50, 51.15).buffer(0.0002),
+                                      Point(71.60, 51.15).buffer(0.0002)], crs=4326)
+    site.to_file(site_path, driver="GeoJSON")
+    gov = gpd.GeoDataFrame({"OBJECTID": [1]}, geometry=[Point(71.50, 51.15).buffer(0.0003)],
+                           crs=4326)
+    monkeypatch.setattr(gov_waste, "SITE", site_path)
+    assert gov_waste.attach(gov) == 0
+    out = gpd.read_file(site_path).set_index("candidate_id")["gov_registry_m"]
+    assert out["A"] == 0
+    assert 6_000 < out["B"] < 7_500      # 0,1° долготы на 51° с.ш. ≈ 7 км
