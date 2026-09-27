@@ -4,6 +4,11 @@
     <!-- Тема ставится ДО первой отрисовки — синхронным скриптом с того же
          сайта (встроенный блокирует CSP). Подробности в самом файле. -->
     <script src="/theme-init.js"></script>
+    <!-- Спутниковая плитка Esri — самый крупный элемент экрана (LCP), и
+         грузится она только после запуска карты. Соединение открывается
+         заранее, пока качаются скрипты. crossorigin — как у слоя плиток
+         (basemaps.ts), иначе браузер не переиспользует соединение. -->
+    <link rel="preconnect" href="https://server.arcgisonline.com" crossorigin />
 
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
