@@ -38,6 +38,10 @@ if hasattr(sys.stdout, "reconfigure"):
 
 DATA = Path("web-next/public/data")
 OUT = Path("docs/NUMBERS.md")
+#: Итоги прогонов: площадь, число областей, просмотрено человеком. Папки
+#: outputs_* в репозиторий не входят (сотни мегабайт), и без этого файла
+#: на чистой копии — в CI — страница получала «0 км²» и «просмотрено 0».
+RUNS = DATA / "runs.json"
 
 
 def ru(value: float, digits: int = 0) -> str:
@@ -151,6 +155,12 @@ def main() -> int:
             # страницы: она нужнее целой, чем точной до объекта.
             with contextlib.suppress(Exception):
                 reviewed += len(gpd.read_file(path))
+    if counted:
+        RUNS.write_text(json.dumps({"covered_km2": round(covered, 3), "areas": counted,
+                                    "reviewed": reviewed}, indent=1) + "\n", encoding="utf-8")
+    elif RUNS.exists():
+        runs = json.loads(RUNS.read_text(encoding="utf-8"))
+        covered, counted, reviewed = runs["covered_km2"], runs["areas"], runs["reviewed"]
 
     L = [
         "# Числа проекта",
