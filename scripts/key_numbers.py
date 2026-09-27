@@ -96,6 +96,9 @@ def main() -> int:
     # разметки оно разошлось с данными.
     screen_path = DATA / "screen.json"
     screen = json.loads(screen_path.read_text(encoding="utf-8")) if screen_path.exists() else {}
+    # Точность модели по снимку — из scripts/attach_chipmodel.py.
+    image_path = DATA / "image_model.json"
+    image = json.loads(image_path.read_text(encoding="utf-8")) if image_path.exists() else {}
 
     dumps = int((site["visual_check"] == "landfill").sum())
     unclear = int((site["visual_check"] == "unclear").sum())
@@ -305,7 +308,12 @@ def main() -> int:
            f"{screen['rejected_not_landfill']}, не разобрать {screen['rejected_unclear']}, "
            f"свалка {screen['rejected_landfill']} | снимает {ru(100 * screen['workload_removed'])}% работы |"]
           if screen else []),
-        "| Перенос AerialWaste | 0,680 (0,517 – 0,841) | на 51 объекте |",
+        *([f"| Модель по снимку 0,4 м, ROC-AUC | {ru(image['roc_auc'], 3)} "
+           f"({ru(image['low'], 2)} – {ru(image['high'], 2)}) | на {image['objects']} "
+           f"{plural(image['objects'], 'объекте', 'объектах', 'объектах')}, "
+           f"свалок {image['dumps']}; ниже 0,35 — {image['dumps_below_035']} из них |"]
+          if image else []),
+        "| Прежняя модель на AerialWaste | 0,680 (0,517 – 0,841) | снята: слабее и некоммерческая лицензия |",
         "| Своя модель на нашей разметке | 0,326 (0,202 – 0,450) | **хуже случайного, не поставлена** |",
         "| Пять признаков, свалка против склада | 0,500 | различает не спектр, а карта |",
         "| Пять признаков, промзона против поля | 0,930 | и это единственное, что они умеют |",
