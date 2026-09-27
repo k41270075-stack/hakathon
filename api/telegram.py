@@ -586,6 +586,7 @@ class handler(BaseHTTPRequestHandler):
         lines += [
             "Vantage AI bot",
             f"Объектов в указателе: {len(candidates())}",
+            f"Поездок на выезд (/route): {len(trips())}",
             f"Токен задан: {'да' if token() else 'НЕТ'}",
             f"Секрет задан: {'да' if secret_given else 'НЕТ'}",
             f"Подписчиков: {len(subscribers()) or 'НЕТ'}",
