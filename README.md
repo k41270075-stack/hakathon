@@ -41,7 +41,7 @@ Future Minds Hackathon 2026 · трек EcoFin · Астана
 | [Предложение о пилоте](docs/PROPOSAL.md) · [қазақша](docs/PROPOSAL_KZ.md) · [English](docs/PROPOSAL_EN.md) | что делаем, что нужно от заказчика, чем меряется успех; PDF — в `docs/proposal/` и на сайте |
 | Паспорта объектов — `web-next/public/data/export/passports.pdf`, по одному файлу — `python scripts/make_passports.py` | одна страница на объект: снимки «до/сейчас», деньги, что проверить на месте |
 | [Инструкция инспектора](docs/INSPECTOR.md) | от очереди до акта: выезд, четыре кадра, запись одной командой |
-| [Маршрут выезда](docs/FIELD.md) | куда ехать первым и что снимать |
+| [Маршрут выезда](docs/FIELD.md) | куда ехать первым, поездки с готовым маршрутом в Google Maps и что снимать |
 | [План пилота](docs/PILOT.md) | восемь недель по неделям и где пилот вправе провалиться |
 | [Куда идти за пилотом и деньгами](docs/FUNDING.md) | Astana Hub, QazInnovations — со ссылками на источники |
 | Выгрузка реестра, `web-next/public/data/export/` | KML для ГИС, GPX для навигатора, CSV для Excel, GeoJSON |
