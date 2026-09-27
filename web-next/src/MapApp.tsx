@@ -257,9 +257,14 @@ function humanDay(v: unknown) {
   return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
+/* Месяц без числа — в именительном: «май 2024», а не «мая 2024».
+   Родительный падеж нужен только с днём («5 мая 2024», humanDay). */
+const MONTHS_NOM = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь',
+  'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
+
 function humanDate(v: unknown) {
   const d = new Date(String(v));
-  return Number.isNaN(d.getTime()) ? '—' : `${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+  return Number.isNaN(d.getTime()) ? '—' : `${MONTHS_NOM[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 /** Слагаемые ущерба по одному объекту — из economy.json. */
