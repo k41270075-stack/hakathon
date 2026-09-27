@@ -45,6 +45,12 @@ MODEL = ROOT / "models/scan_window.joblib"
 CELL = 340
 #: Вес просмотренных окон: свалок — десятки против тысяч фона.
 POS_WEIGHT, NEG_WEIGHT = 10.0, 5.0
+#: Непросмотренные окна идут в обучение как фон («не свалка») только с
+#: участков, где среди просмотренных окон свалок меньше этой доли. На
+#: северо-востоке их 64% — вокруг городского полигона, — и его фон
+#: учил модель считать мусор «не свалкой»: круг 2 с ним был хуже круга 1
+#: на обоих участках проверки (AI_RESULTS.md, 1ц).
+CLEAN_BACKGROUND_SHARE = 0.5
 
 
 def key_path(area: str) -> Path:
@@ -119,6 +125,8 @@ def fit(areas: list[str]):
         seen = [v["index"] for v in key.values()]
         neg = [i for i in seen if i not in dump]
         rest = np.setdiff1d(np.arange(len(cls)), seen)
+        if len(dump) >= CLEAN_BACKGROUND_SHARE * len(seen):
+            rest = rest[:0]
         X += [cls[rest], cls[neg], cls[dump]]
         Y += [np.zeros(len(rest)), np.zeros(len(neg)), np.ones(len(dump))]
         W += [np.ones(len(rest)), np.full(len(neg), NEG_WEIGHT), np.full(len(dump), POS_WEIGHT)]
