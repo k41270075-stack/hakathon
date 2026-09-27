@@ -140,7 +140,14 @@ def sheets(area: str, top: int) -> int:
     else:
         clf = fit(reviewed_areas())
         cls, _, _ = features(area)
-        score = clf.decision_function(cls)
+        score = rank(clf.decision_function(cls))
+        # С SkyCLIP в смеси проверяющему достаётся больше свалок: на двух
+        # участках проверки смесь 0,7/0,3 поднимала их в верхних 10% окон.
+        sky_path = SCAN / f"scores_{area}.npz"
+        if sky_path.exists():
+            sky = np.load(sky_path)
+            if "skyclip" in sky and len(sky["skyclip"]) == len(score):
+                score = 0.7 * score + 0.3 * rank(sky["skyclip"])
     assert len(cells) == len(score), "окна не совпали с оценками"
     order = np.argsort(-score)[:top]
     folder = SCAN / f"review_{area}"
