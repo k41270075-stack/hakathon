@@ -128,6 +128,7 @@ def main() -> int:
     env.configure()
     parser = argparse.ArgumentParser()
     parser.add_argument("--bbox", default=DEFAULT_BBOX)
+    parser.add_argument("--name", default="area")
     args = parser.parse_args()
     bbox = tuple(float(v) for v in args.bbox.split(","))
     release = releases()[-1][1]
@@ -156,42 +157,61 @@ def main() -> int:
     ranks = [np.argsort(np.argsort(s)) / (len(s) - 1) for s in scores.values()]
     scores["среднее"] = np.mean(ranks, axis=0)
 
-    # Разметка госмониторинга: окно — «со свалкой», если центр полигона в
-    # центральной половине окна (±48 м от центра — полтайла z18).
-    gov = gpd.read_file(ROOT / "data/gov_waste/astana.geojson")
-    pts = gov.geometry.representative_point()
+    # Разметка: окно — «со свалкой», если центр полигона в центральной
+    # половине окна (±48 м от центра — полтайла z18). Два набора: свалки
+    # госмониторинга и опознанные человеком свалки нашего экзамена.
     w, s, e, n = bbox
-    inside = pts[(pts.x >= w) & (pts.x <= e) & (pts.y >= s) & (pts.y <= n)]
     half_lat = 48 / 111_320
     half_lon = 48 / (111_320 * math.cos(math.radians((s + n) / 2)))
-    label = np.zeros(len(cells), dtype=int)
-    nearest = {}
-    for i, p in enumerate(inside):
-        hit = (np.abs(lats - p.y) <= half_lat) & (np.abs(lons - p.x) <= half_lon)
-        label[hit] = 1
-        nearest[i] = np.flatnonzero(hit)
+
+    def labels_for(points):
+        label = np.zeros(len(cells), dtype=int)
+        nearest = {}
+        for i, p in enumerate(points):
+            hit = (np.abs(lats - p.y) <= half_lat) & (np.abs(lons - p.x) <= half_lon)
+            label[hit] = 1
+            nearest[i] = np.flatnonzero(hit)
+        return label, nearest
+
+    def within(points):
+        return points[(points.x >= w) & (points.x <= e) & (points.y >= s) & (points.y <= n)]
+
+    gov = gpd.read_file(ROOT / "data/gov_waste/astana.geojson")
+    inside = within(gov.geometry.representative_point())
+    label, nearest = labels_for(inside)
     print(f"── госсвалок на участке: {len(inside)}; окон со свалкой: {int(label.sum())}")
+    ours = gpd.read_file(ROOT / "data/eval/labeled.geojson").to_crs(4326)
+    ours_in = within(ours[ours["truth"] == "landfill"].geometry.representative_point())
+    _, our_nearest = labels_for(ours_in)
+    print(f"── наших опознанных свалок на участке: {len(ours_in)}")
 
     results = {"bbox": bbox, "windows": len(cells), "gov_dumps": len(inside),
-               "positive_windows": int(label.sum()), "models": {}}
+               "positive_windows": int(label.sum()), "our_dumps": len(ours_in),
+               "models": {}}
     for name, s in scores.items():
         order = np.argsort(-s)
         rank = np.empty(len(s), dtype=int)
         rank[order] = np.arange(len(s))
-        row = {"roc_auc": round(float(roc_auc_score(label, s)), 3)}
+        row = {"roc_auc": round(float(roc_auc_score(label, s)), 3) if 0 < label.sum() < len(label)
+               else None}
         for share in (0.05, 0.10, 0.20):
             top = rank < int(share * len(s))
             covered = sum(bool(top[idx].any()) for idx in nearest.values() if len(idx))
             row[f"dumps_in_top_{int(share * 100)}pct"] = int(covered)
+            row[f"ours_in_top_{int(share * 100)}pct"] = int(
+                sum(bool(top[idx].any()) for idx in our_nearest.values() if len(idx)))
         results["models"][name] = row
-        print(f"   {name:8} ROC-AUC {row['roc_auc']:.3f}; свалок в верхних 5% окон: "
+        print(f"   {name:8} ROC-AUC {row['roc_auc']}; госсвалок в верхних 5% окон: "
               f"{row['dumps_in_top_5pct']}, 10%: {row['dumps_in_top_10pct']}, "
-              f"20%: {row['dumps_in_top_20pct']} из {len(inside)}")
+              f"20%: {row['dumps_in_top_20pct']} из {len(inside)}; наших: "
+              f"{row['ours_in_top_5pct']}/{row['ours_in_top_10pct']}/{row['ours_in_top_20pct']}"
+              f" из {len(ours_in)}")
     print(f"   случайный порядок: в 10% окон ≈ {0.10 * len(inside):.0f} свалок")
-    OUT.write_text(json.dumps(results, ensure_ascii=False, indent=1), encoding="utf-8")
-    np.savez_compressed(ROOT / "data/scan/scores.npz", lat=lats, lon=lons, label=label,
+    out = OUT if args.bbox == DEFAULT_BBOX else OUT.with_name(f"scan_tiles_{args.name}.json")
+    out.write_text(json.dumps(results, ensure_ascii=False, indent=1), encoding="utf-8")
+    np.savez_compressed(ROOT / f"data/scan/scores_{args.name}.npz", lat=lats, lon=lons, label=label,
                         **{k: v for k, v in scores.items() if k.isascii()})
-    print(f"── записано в {OUT.relative_to(ROOT)}")
+    print(f"── записано в {out.relative_to(ROOT)}")
     return 0
 
 
